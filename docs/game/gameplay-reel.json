@@ -1,0 +1,35 @@
+{
+  "file": "output/frostbound-gameplay-20s-1080p60.mp4",
+  "bytes": 17396080,
+  "duration": 20.0,
+  "resolution": "1920x1080",
+  "fps": 60,
+  "frames": 1200,
+  "videoCodec": "h264",
+  "audio": "AAC 48 kHz stereo / 160 kbps",
+  "shots": [
+    {
+      "shot": "ice",
+      "duration": 4.5,
+      "hits": 101
+    },
+    {
+      "shot": "sword",
+      "duration": 4.5,
+      "hits": 112
+    },
+    {
+      "shot": "cultivator",
+      "duration": 6,
+      "hits": 159
+    },
+    {
+      "shot": "awakening",
+      "duration": 5,
+      "hits": 44
+    }
+  ],
+  "source": "Real Three.js game simulation, deterministic 1/60 s capture. Scripted level-30 combat, no player save access.",
+  "music": "BiteMe Games — Lotus Pond (the existing licensed local game soundtrack)",
+  "compressionSSIM": 0.97154
+}

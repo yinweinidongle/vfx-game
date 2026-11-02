@@ -9,3 +9,5 @@ output/
 *.zip
 *.log
 assets/
+__pycache__/
+*.pyc

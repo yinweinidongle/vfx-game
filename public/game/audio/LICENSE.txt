@@ -1,0 +1,13 @@
+Track: Lotus Pond - Loop
+Author: BiteMe Games
+Pack: Chinese Game Music v1.0
+Source: https://bitemegames.itch.io/chinese-game-music
+Downloaded: 2026-11-01
+
+The author's page identifies the asset license as Creative Commons Zero v1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+The same page permits commercial project use without attribution and says not to resell the asset edit.
+
+This game includes a 160 kbit/s MP3 conversion of the 60-second looping WAV.
+The original WAV and author's about.txt are retained in assets/rpg-source/audio/ in the working project.
+No generated composition or authorship is claimed for this recording.

@@ -1,0 +1,24 @@
+{
+  "release": "20261102T000638Z",
+  "previous": "20261102T000426Z",
+  "originalPrevious": "20261101T232703Z",
+  "serverVerifiedFiles": 66,
+  "publicVerified": [
+    "assets/HaloBolts-CFsL2YKV.js",
+    "assets/RPGGame-Bb-nEwhm.js",
+    "assets/game-DhTesmKq.js",
+    "assets/lab-DlCbNCkD.js",
+    "assets/three-addons-D9G-csvN.js",
+    "assets/three-core-CFsVx962.js",
+    "game.html",
+    "index.html"
+  ],
+  "testsPassed": 170,
+  "vfxShaderErrors": 0,
+  "productionShaderErrors": 0,
+  "productionConsoleErrors": 0,
+  "saveUnchanged": true,
+  "postAttackPoolsCleared": true,
+  "bloomStrength": 0.42,
+  "bloomThreshold": 1.1
+}

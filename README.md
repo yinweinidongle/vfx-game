@@ -321,6 +321,6 @@ skill.fire();
 
 ## GitHub Pages
 
-项目使用 Vite 双入口：`game.html` 是游戏，`index.html` 是技能实验室。GitHub Actions 在推送到 `main` 后运行测试并部署 Pages；在仓库 Settings → Pages 中将 Source 设为 **GitHub Actions**。项目站点的游戏地址为 `https://<用户名>.github.io/<仓库名>/game.html`。
+项目使用 Vite 双入口：`game.html` 是游戏，`index.html` 是技能实验室。GitHub Actions 在推送到 `main` 或 `master` 后运行测试并部署 Pages；在仓库 Settings → Pages 中将 Source 设为 **GitHub Actions**。项目站点的游戏地址为 `https://<用户名>.github.io/<仓库名>/game.html`。
 
 本地开发执行 `npm ci`、`npm run dev`；验证子路径部署可执行 `VITE_BASE_PATH=/vfx-game/ npm run build`。运行所需的优化模型和纹理在 `public/` 中。`assets/` 保存体积较大的原始生成素材和第三方母版，未纳入仓库；若要重新运行素材制备脚本，需要按 `docs/game/ASSETS.md` 准备这些源文件。

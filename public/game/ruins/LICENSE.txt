@@ -1,0 +1,9 @@
+Ultimate Modular Ruins Pack — Quaternius
+License: CC0 1.0 Universal
+Official source: https://quaternius.com/packs/ultimatemodularruins.html
+License: https://creativecommons.org/publicdomain/zero/1.0/
+
+The author distributes these assets under CC0. This project selects 12 modules,
+converts FBX centimetres to glTF metres, consolidates materials and geometry,
+and adjusts the stone palette. Original FBX production files are retained in
+assets/rpg-source/ruins/FBX/ in the working project.

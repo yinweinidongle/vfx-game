@@ -1,0 +1,29 @@
+{
+  "provider": "Doubao seed-tts-2.0",
+  "voices": [
+    {
+      "class": "sword",
+      "text": "一剑，敕雷！",
+      "speaker": "zh_female_vv_uranus_bigtts",
+      "direction": "请用年轻女剑客的声音，凌厉果断、有爆发力地喊出战斗绝招，前两字略蓄力，后两字利落有力。只念台词，不要旁白，不要背景音。",
+      "bytes": 25389,
+      "path": "public/game/audio/awakening/sword-v1.mp3"
+    },
+    {
+      "class": "ice",
+      "text": "霜落，雷鸣！",
+      "speaker": "zh_female_gaolengyujie_uranus_bigtts",
+      "direction": "请用冷静高傲的女弓箭手声音，克制但有压迫感地念出终极技能台词，两段短句干净利落。只念台词，不要旁白，不要背景音。",
+      "bytes": 29229,
+      "path": "public/game/audio/awakening/ice-v1.mp3"
+    },
+    {
+      "class": "cultivator",
+      "text": "诸天，听令！",
+      "speaker": "zh_female_cancan_uranus_bigtts",
+      "direction": "请用威严沉稳的女仙尊声音，像向天地下达敕令一样念这句短台词，前半庄重，后半坚定有力。只念台词，不要旁白，不要背景音。",
+      "bytes": 25389,
+      "path": "public/game/audio/awakening/cultivator-v1.mp3"
+    }
+  ]
+}
