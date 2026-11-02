@@ -1,8 +1,0 @@
-[Unit]
-Description=Renew TLS certificate for game.xqsingular.com
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/opt/3d-model-studio/venv/bin/certbot renew --cert-name game.xqsingular.com --quiet --deploy-hook "/usr/bin/systemctl reload nginx"
