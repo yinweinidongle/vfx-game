@@ -1,0 +1,27 @@
+{
+  "name": "frostbound-vfx-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "prepare:ruins": "node scripts/prepare-rpg-ruins.mjs",
+    "prepare:motion": "node scripts/prepare-rpg-motion.mjs",
+    "prepare:game-assets": "node scripts/optimize-rpg-assets.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
+    "vite": "^7.1.0",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.2.0",
+    "sharp": "^0.35.5"
+  }
+}
