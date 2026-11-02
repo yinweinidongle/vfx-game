@@ -1,0 +1,18 @@
+.awakening-cutin{position:absolute;inset:0;z-index:35;pointer-events:none;overflow:hidden;isolation:isolate;--awakening-color:#9ddfff}
+.awakening-cutin[hidden]{display:none}
+.awakening-shade{position:absolute;inset:0;background:linear-gradient(110deg,#020916f0 0%,#061526e8 34%,#020d19ad 67%,#07162578);box-shadow:inset 0 70px 0 #020812cf,inset 0 -60px 0 #020812cf}
+.awakening-lattice{position:absolute;inset:12% -20% 12%;transform:rotate(-9deg);opacity:.35;background:repeating-linear-gradient(0deg,transparent 0 26px,color-mix(in srgb,var(--awakening-color) 36%,transparent) 27px,transparent 28px),linear-gradient(90deg,transparent 30%,var(--awakening-color),transparent 86%);mask-image:linear-gradient(90deg,transparent,#000 60%,transparent);mix-blend-mode:screen}
+.awakening-portrait{position:absolute;top:-4%;bottom:-25%;right:0;width:64%;transform-origin:58% 36%;mask-image:linear-gradient(90deg,transparent,#000 16%,#000 95%,transparent);filter:drop-shadow(-12px 0 28px color-mix(in srgb,var(--awakening-color) 38%,transparent))}
+.awakening-portrait img{display:block;width:100%;height:100%;object-fit:contain;object-position:center 18%}
+.awakening-copy{position:absolute;left:8%;top:38%;width:48%;text-shadow:0 3px 25px #000;z-index:2}
+.awakening-copy>span{font-size:10px;letter-spacing:.3em;color:var(--awakening-color)}.awakening-copy i{font-style:normal;margin:0 13px}
+.awakening-copy h1{font-family:'Songti SC','Noto Serif SC',serif;font-weight:500;font-size:clamp(38px,5.8vw,84px);letter-spacing:.15em;margin:14px 0 22px;color:#f6f7ec;line-height:1.2}
+.awakening-copy p{font-family:'Songti SC',serif;font-size:clamp(18px,2.2vw,30px);letter-spacing:.25em;color:#effaff;margin:24px 0 16px}
+.awakening-copy small{font-size:8px;letter-spacing:.35em;color:#a2b6c8}.awakening-rule{height:1px;width:58%;background:linear-gradient(90deg,var(--awakening-color),transparent);box-shadow:0 0 15px var(--awakening-color)}
+.awakening-slash{position:absolute;inset:-10% 0;width:9%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--awakening-color) 50%,transparent),#f1ffff,transparent);opacity:.5;z-index:4;mix-blend-mode:screen}
+.awakening-flash{position:absolute;inset:0;background:#e8faff;opacity:0;z-index:5}
+.skill-slot.awakening-slot{border-color:#baa3e3}.awakening-icon{display:block;width:100%;height:100%;background:radial-gradient(ellipse at 50% 30%,#a4b2ff4d,transparent 66%),linear-gradient(145deg,#202c49,#10112d);position:relative;overflow:hidden}
+.awakening-icon:before{content:'';position:absolute;inset:3px 14px;background:linear-gradient(#eaffff,#bfa4ff);clip-path:polygon(65% 0,15% 53%,45% 51%,30% 100%,88% 39%,57% 41%);filter:drop-shadow(0 0 5px #8c86ff)}
+.awakening-slot.awakening-ready{box-shadow:0 0 16px #b99ce849,inset 0 0 12px #8e9cf633}.awakening-slot.locked .awakening-icon{filter:saturate(.1) brightness(.45)}.awakening-slot.locked .cooldown-text{font-size:12px;color:#b5c4cf}.awakening-slot.locked kbd{background:#626d7c;color:#e1e4e9}.awakening-slot .skill-name{color:#e1cfff}
+@media(max-width:800px){.awakening-copy{left:6%;top:43%}.awakening-copy h1{font-size:42px}.awakening-portrait{width:78%;right:-19%;top:2%;bottom:-18%}.awakening-copy>span{font-size:8px;letter-spacing:.15em}.awakening-copy i{margin:0 5px}.awakening-copy small{font-size:6px;letter-spacing:.2em}.skill-dock{gap:12px}.dodge-hint{display:none}}
+@media(max-width:500px){.awakening-copy{top:57%;width:90%}.awakening-copy h1{font-size:37px;margin-bottom:10px}.awakening-copy p{margin:14px 0}.awakening-portrait{right:-12%;top:-8%;bottom:0;width:100%;opacity:.9}.awakening-copy>span{font-size:8px}.awakening-copy small{display:none}.skill-slot{width:49px;height:49px}.skill-slot .item-art{width:47px;height:47px}.skill-slots{gap:7px}}

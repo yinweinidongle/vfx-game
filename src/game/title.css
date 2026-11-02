@@ -1,0 +1,59 @@
+#title-screen{--look-x:0px;--look-y:0px;background:#143a49}
+.title-scene{position:fixed;inset:0;overflow:hidden;pointer-events:none;isolation:isolate}
+.title-scene>div,.title-dust{position:absolute;inset:-3%;width:106%;height:106%;pointer-events:none}
+.title-art{background-image:url('/game/art/title-sanctuary-v2.webp');background-position:58% center;animation:world-breathe 26s ease-in-out infinite alternate;will-change:transform}
+.title-foreground{background:url('/game/art/title-foreground-v2.webp') center/cover no-repeat;transform:translate(calc(var(--look-x)*-36 + 3vw),calc(var(--look-y)*-22 - 2vh));opacity:.9;filter:drop-shadow(-8px 12px 8px #031b2d33);will-change:transform}
+.title-sanctuary-glow{background:radial-gradient(ellipse at 77% 44%,#ffe8ac24,transparent 17%);mix-blend-mode:screen;animation:sanctuary-light 7s ease-in-out infinite alternate}
+.title-mist{background:url('/game/art/title-mist-v2.webp') center bottom/cover no-repeat;mix-blend-mode:screen;will-change:transform}
+.title-scene>.title-mist-far{top:10%;bottom:-30%;height:120%;opacity:.24;animation:mist-far 36s ease-in-out infinite alternate}
+.title-scene>.title-mist-near{top:31%;bottom:-52%;height:120%;width:130%;left:-15%;opacity:.23;filter:blur(2px);animation:mist-near 23s ease-in-out infinite alternate}
+.title-dust{inset:0;width:100%;height:100%}
+.title-shade{background:linear-gradient(90deg,#07202be8 0%,#092734ad 31%,#09273410 62%,transparent 85%),linear-gradient(0deg,#061822e8 0,transparent 19%,transparent 85%,#071e2a70 100%)}
+.title-header{padding-top:26px;z-index:1}.title-header a{font-size:13px}.title-edition{font-size:10px;letter-spacing:.15em;color:#d4e4df}
+.title-content{width:min(440px,43vw);margin:clamp(20px,4vh,60px) 0 96px 7.2%}
+.title-eyebrow{color:#bbd9d8;font-size:9px;letter-spacing:.32em}
+.title-content>h1{font-size:clamp(72px,7.6vw,112px);color:#f2f1df;letter-spacing:.26em;text-shadow:0 3px 24px #06151a66;line-height:1.25;margin-top:16px}
+.title-content>h2{font-size:23px;letter-spacing:.5em;margin:9px 0 24px;color:#e2cda0}
+.title-description{color:#d0ddda;font-size:12px;line-height:2.1}
+.class-label{margin-top:28px;padding-top:18px;color:#e4e5d6;border-color:#cfdbc833}.class-label span{color:#b8cbc5}
+.class-select{gap:8px}.class-select button{background:#0d2c388c;backdrop-filter:blur(12px);padding:10px 6px;transition:background .25s,border-color .25s,transform .25s}
+.class-select button:hover{transform:translateY(-3px);background:#29494eaa}.class-select button[aria-pressed=true]{background:linear-gradient(140deg,#50615b99,#203f45bb);border-color:#e3cfa5;box-shadow:inset 0 1px 0 #f1dec466,0 6px 24px #06192133}
+.class-select .item-art{width:48px;height:48px}.class-select strong{font-size:14px}.class-select small{color:#bdcfca}
+#class-description{min-height:37px;line-height:1.7;color:#c1d3ce}.title-meta{color:#bdd0ca}
+.title-footer{align-items:center;color:#c0d0c5a8;z-index:2;padding:17px 4.6%}.title-utilities{display:flex;gap:26px;align-items:center}.music-control{display:flex;align-items:center;gap:13px}.title-footer #music-toggle{display:flex;align-items:center;gap:9px;color:#d8e4d6;font-size:10px;padding:6px 0}.music-control input{width:62px;height:2px;accent-color:#d6bd8a;cursor:pointer;opacity:.7}.music-bars{display:flex;align-items:center;gap:2px;height:16px}.music-bars i{width:2px;height:3px;background:#ddcba3;border-radius:2px}.playing .music-bars i{animation:music-meter 1.3s ease-in-out infinite alternate}.playing .music-bars i:nth-child(2){animation-delay:-.6s}.playing .music-bars i:nth-child(3){animation-delay:-.9s}.playing .music-bars i:nth-child(4){animation-delay:-.25s}
+@keyframes world-breathe{from{transform:translate(calc(var(--look-x)*-9),calc(var(--look-y)*-7)) scale(1.02)}to{transform:translate(calc(var(--look-x)*-9 - .6vw),calc(var(--look-y)*-7 + .4vh)) scale(1.055)}}
+@keyframes sanctuary-light{from{opacity:.55}to{opacity:1}}
+@keyframes mist-far{from{transform:translate(-2%,1%)}to{transform:translate(4%,-2%)}}
+@keyframes mist-near{from{transform:translate(5%,2%) scale(1.06)}to{transform:translate(-5%,-1%) scale(1.12)}}
+@keyframes music-meter{from{height:3px}to{height:14px}}
+@media(max-height:780px) and (min-width:800px){.title-content{margin-top:6px;margin-bottom:72px;width:400px}.title-content>h1{font-size:76px;margin-top:9px}.title-content>h2{font-size:20px;margin-bottom:16px}.class-label{margin-top:18px;padding-top:14px}.class-select .item-art{width:38px;height:38px}.class-select button{padding:8px 5px}.class-select small{margin-top:4px}.title-meta{margin-top:12px}.title-description{font-size:11px}.primary{min-height:48px;padding:13px 20px}}
+@media(max-width:800px){.title-content{width:min(430px,82vw);margin:22px 0 115px 9%}.title-art{background-position:65% center}.title-shade{background:linear-gradient(90deg,#07202bea,#09273488 70%,#09273433)}.title-foreground{opacity:.55}.title-edition{display:none}.title-footer>span{display:none}.title-footer{justify-content:center}.title-content>h1{font-size:76px}.title-utilities{gap:22px}}
+@media(prefers-reduced-motion:reduce){.title-scene *, .playing .music-bars i{animation:none!important;will-change:auto}.title-foreground{transform:translate(3vw,-2vh)}}
+
+/* Illustrated relics: tiny asynchronous diamond glints stay on the item itself. */
+.class-select{position:relative;isolation:isolate}
+.class-select button{position:relative;min-width:0;overflow:hidden;padding:10px 6px 14px}
+.class-select strong,.class-select small{position:relative;z-index:2;display:block}
+.class-relic{--glint:#d8c9ff;position:relative;display:block;width:80px;height:80px;margin:0 auto 9px;isolation:isolate;mix-blend-mode:screen;pointer-events:none}
+.class-select .class-relic .item-art{width:100%;height:100%;margin:0;mix-blend-mode:screen;filter:drop-shadow(0 0 8px #9dcff922);transition:filter .3s,transform .4s}
+.class-select button:hover .item-art,.class-select button:focus-visible .item-art{transform:translateY(-2px);filter:drop-shadow(0 0 9px #d5f2ff55) brightness(1.12)}
+.class-select [data-class=ice] .class-relic{--glint:#9cecff}
+.class-select [data-class=cultivator] .class-relic{--glint:#ffe5ad}
+.relic-glints{position:absolute;inset:0;mix-blend-mode:screen;pointer-events:none}
+.relic-glints i{position:absolute;width:15px;height:15px;left:68%;top:17%;opacity:0;transform:scale(.1) rotate(0deg);filter:drop-shadow(0 0 3px var(--glint));animation:relic-diamond-blink 5.8s ease-in-out infinite}
+.relic-glints i:before,.relic-glints i:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--glint),#fff 45%,#fff 55%,var(--glint));clip-path:polygon(50% 0,57% 42%,100% 50%,57% 58%,50% 100%,43% 58%,0 50%,43% 42%)}
+.relic-glints i:after{inset:3px;transform:rotate(45deg);opacity:.55}
+.relic-glints i:nth-child(2){left:40%;top:46%;width:11px;height:11px;animation-delay:-2.35s;animation-duration:6.4s}
+.relic-glints i:nth-child(3){left:25%;top:72%;width:8px;height:8px;animation-delay:-4.1s;animation-duration:7.1s}
+[data-class=ice] .relic-glints i{left:68%;top:19%;animation-delay:-1.7s}
+[data-class=ice] .relic-glints i:nth-child(2){left:45%;top:43%;animation-delay:-3.6s}
+[data-class=ice] .relic-glints i:nth-child(3){left:27%;top:72%;animation-delay:-.6s}
+[data-class=cultivator] .relic-glints i{left:47%;top:13%;animation-delay:-3.2s}
+[data-class=cultivator] .relic-glints i:nth-child(2){left:73%;top:49%;animation-delay:-.8s}
+[data-class=cultivator] .relic-glints i:nth-child(3){left:23%;top:65%;animation-delay:-2.3s}
+@keyframes relic-diamond-blink{0%,62%,100%{opacity:0;transform:scale(.12) rotate(-12deg)}68%{opacity:.32;transform:scale(.45) rotate(0deg)}73%{opacity:1;transform:scale(1) rotate(12deg)}77%{opacity:.55;transform:scale(.65) rotate(22deg)}84%{opacity:0;transform:scale(.1) rotate(32deg)}}
+.class-select button:after{content:'';position:absolute;bottom:0;left:32%;right:32%;height:1px;background:#dfc58c;opacity:0;transition:opacity .3s}.class-select button[aria-pressed=true]:after{opacity:1}
+@media(max-height:800px) and (min-width:801px){.class-relic{width:66px;height:66px;margin-bottom:7px}.title-content>h1{font-size:64px}.title-content>h2{margin-bottom:12px}.title-content{margin-top:0}.title-description{font-size:10px;line-height:1.85}.class-label{margin-top:14px;padding-top:12px}.class-select small{margin-top:5px}.title-content .class-select button{padding:8px 5px 10px}.title-content #class-description{padding:7px 0;min-height:30px}.title-meta{margin-top:10px}}
+@media(max-width:600px){.class-relic{width:68px;height:68px}.class-select strong{font-size:13px}.class-select small{font-size:8px}.class-select button{padding-bottom:12px}.class-label span{font-size:8px}}
+@media(max-height:820px) and (max-width:800px){.title-content{margin-top:6px}.title-content>h1{font-size:64px;margin-top:9px}.title-content>h2{font-size:20px;margin-bottom:14px}.class-label{margin-top:19px;padding-top:14px}.class-relic{width:66px;height:66px}.title-description{font-size:11px;line-height:1.85}.title-meta{margin-top:12px}.title-content #class-description{min-height:31px;padding:7px 0}.title-footer{padding-top:12px;padding-bottom:12px;background:linear-gradient(0deg,#071c26d9,transparent)}}
+@media(prefers-reduced-motion:reduce){.relic-glints i{animation:none;opacity:0}.class-select .class-relic .item-art{transition:none;transform:none!important}}
