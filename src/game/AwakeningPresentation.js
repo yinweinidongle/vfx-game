@@ -10,7 +10,7 @@ export class AwakeningPresentation {
     document.querySelector('#game-screen').append(root);this.portrait=root.querySelector('.awakening-portrait');this.copy=root.querySelector('.awakening-copy');this.flash=root.querySelector('.awakening-flash');this.slash=root.querySelector('.awakening-slash');
     this.ready=root.querySelector('img').decode().catch(()=>{root.classList.add('portrait-unavailable');});
   }
-  begin(){this.age=0;this.root.hidden=false;this.root.style.opacity='0';this.game.input.clear();}
+  begin(event={}){this.style=awakeningStyle(this.game.state.kind,event.index??3);this.root.style.setProperty('--awakening-color',this.style.color);this.copy.querySelector('h1').textContent=this.style.name;this.copy.querySelector('p').textContent=this.style.line;this.copy.querySelector('span').textContent='境界觉醒 · '+this.style.motif;this.copy.querySelector('small').textContent=this.style.subtitle||'THUNDER ANSWERS YOUR CALL';this.age=0;this.root.hidden=false;this.root.style.opacity='0';this.game.input.clear();}
   get timeScale(){return this.age<.085?0:this.age<.64?.24:1;}
   get darkness(){return this.age<.9?Math.min(1,this.age*12):Math.max(0,1-(this.age-.9)/3.7)*.8;}
   update(dt){

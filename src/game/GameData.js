@@ -10,6 +10,8 @@ export const SKILLS = [
   { id: 'slash', key: 'E', name: '苍雷断空', icon: 13, cost: 46, cooldown: 7.5, description: '月牙剑气自动朝向敌人，远程追击并引发雷爆。' },
   { id: 'divine', key: 'R', name: '法相天劫', icon: 14, cost: 82, cooldown: 22, description: '法相显圣，背后法阵齐射追踪灵光，向敌群降下陨星。' },
   { id: 'awakening', key: 'G', name: '雷霆觉醒', icon: 13, cost: 90, cooldown: 64, unlockLevel: 30, description: '30 级觉醒。四轮雷击席卷周围 32 米战场，自动追踪敌人；同一轮不会重复叠加伤害。' },
+  { id: 'heavenBlade', key: 'H', name: '天刃镇岳', icon: 1, cost: 95, cooldown: 78, unlockLevel: 35, description: '35 级觉醒。锁定敌群召出巨刃，劈开长 14 米、宽 8 米的地面，随后引爆余震。' },
+  { id: 'iceStorm', key: 'J', name: '万象冰劫', icon: 0, cost: 100, cooldown: 92, unlockLevel: 40, description: '40 级觉醒。在敌群中心降下半径 10.5 米的冰暴，持续八次冰击，最后引爆冰封领域。' },
 ];
 export const ITEMS = {
   jade: { name: '听雪玉坠', slot: 'charm', rarity: '稀有', icon: 9, color: '#82cbec', power: .12, vitality: 15, description: '封存着听雪林第一场霜。伤害 +12%，生命 +15。' },

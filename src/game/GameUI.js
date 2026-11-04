@@ -6,27 +6,31 @@ import { swordEvolution } from './SwordEvolution.js';
 import { MAX_FERVOR } from './AttackGrowth.js';
 import { vitalityGrowth, spiritGrowth } from './CultivationGrowth.js';
 import { awakeningStyle } from './AwakeningConfig.js';
+import { GameGearUI,gearIcon } from './GameGearUI.js';
+import { gearName,GEAR_RARITIES } from './GearData.js';
 export class GameUI {
   constructor(game) {
     this.game = game; this.state = game.state; this.frame = 0; this.toastTimer = 0; this.regionTimer = 0; this.lastObjective = ''; this.lastHP = -1;
     this.project = new T.Vector3(); this.numbers = Array.from({ length: 40 }, () => ({ age: 2, x: 0, z: 0, element: document.createElement('span') }));
     const p = CLASSES[this.state.kind];
-    const skillMarkup=SKILLS.map((s,i)=>{const awakening=i===3,name=awakening?awakeningStyle(this.state.kind).name:s.name;return `<button class="skill-slot ${awakening?'awakening-slot':''}" data-skill="${i}" title="${name} · 消耗 ${s.cost} 灵力 · ${s.description}" aria-label="${name}（${s.key}）">${awakening?'<span class="awakening-icon" aria-hidden="true"></span>':itemIcon(s.icon)}<i class="cooldown-mask"></i><strong class="cooldown-text"></strong><kbd>${s.key}</kbd><span class="skill-name">${name}</span><small class="mana-cost">${s.cost}</small></button>`;}).join('');
+    const skillMarkup=SKILLS.map((s,i)=>{const awakening=i>=3,name=awakening?awakeningStyle(this.state.kind,i).name:s.name;return `<button class="skill-slot ${awakening?`awakening-slot awakening-${i}`:''}" data-skill="${i}" title="${name} · 消耗 ${s.cost} 灵力 · ${s.description}" aria-label="${name}（${s.key}）">${awakening?'<span class="awakening-icon" aria-hidden="true"></span>':itemIcon(s.icon)}<i class="cooldown-mask"></i><strong class="cooldown-text"></strong><kbd>${s.key}</kbd><span class="skill-name">${name}</span><small class="mana-cost">${s.cost}</small></button>`;}).join('');
     document.querySelector('#game-hud').innerHTML = `
       <section class="hero-status"><div class="hero-medallion">${itemIcon(p.icon)}<b id="hero-level">1</b></div><div class="hero-vitals"><div class="hero-name"><strong>${p.name}</strong><span id="hero-gold">0 灵石</span></div><div class="hp-track"><i id="hp-fill"></i><span id="hp-label"></span></div><div id="shield-status" hidden><div class="shield-track"><i id="shield-fill"></i></div><small id="shield-label"></small></div><div class="energy-track"><i id="energy-fill"></i></div><small id="energy-label"></small><div class="stamina-track"><i id="stamina-fill"></i></div></div></section>
       <section class="quest-card"><span class="kicker">当前旅程</span><h2 id="quest-title"></h2><p id="quest-text"></p><div class="quest-route"><span id="quest-distance"></span><button id="route-toggle" title="切换路线提示（V）">引路 <kbd>V</kbd></button></div><div id="encounter-status" hidden><span></span><small></small></div></section>
-      <section class="map-corner"><div class="map-caption"><span id="map-region">听雪林地</span><button id="map-open" title="展开地图（M）" aria-label="展开地图">总览 <kbd>M</kbd></button></div><div id="world-cycle" class="world-cycle"><i aria-hidden="true"></i><span></span><small></small></div><canvas id="minimap" width="440" height="368" aria-label="区域地图"></canvas><div class="world-actions"><button id="inventory-button">行囊 <kbd>I</kbd></button><button id="pause-button" aria-label="暂停游戏">暂停 <kbd>Esc</kbd></button></div></section>
+      <section class="map-corner"><div class="map-caption"><span id="map-region">听雪林地</span><button id="map-open" title="展开地图（M）" aria-label="展开地图">总览 <kbd>M</kbd></button></div><div id="world-cycle" class="world-cycle"><i aria-hidden="true"></i><span></span><small></small></div><canvas id="minimap" width="440" height="368" aria-label="区域地图"></canvas><div class="world-actions"><button id="inventory-button">行囊 <kbd>I</kbd></button><button id="shop-button">商会 <kbd>B</kbd></button><button id="pause-button" aria-label="暂停游戏">暂停 <kbd>Esc</kbd></button></div></section>
       <section class="boss-status" hidden><span>失落的守门者</span><h2>归墟之主 · 无相</h2><div><i id="boss-fill"></i></div><p id="boss-phase">第一式 · 守界</p></section>
       <div id="skill-shot" hidden><span id="skill-shot-label"></span><small>移动 / 闪避可结束镜头</small></div><div id="target-status"></div><div id="region-toast"><span id="region-sub"></span><h2 id="region-name"></h2><i></i></div><div id="game-toast" role="status"></div><div id="loot-toast"></div>
       <div id="interact-prompt" hidden><kbd>F</kbd><span></span></div>
       <section class="skill-dock"><div class="basic-hint">${itemIcon(p.icon)}<span>鼠标左键<br><b>${p.primary}</b><small id="attack-form"></small><small id="fervor-count"></small><i id="fervor-progress" aria-hidden="true"></i></span></div><div class="skill-slots">${skillMarkup}<button class="skill-slot heal-slot" id="heal-button" title="恢复 45% 生命，冷却 18 秒" aria-label="治疗（C）">${itemIcon(4)}<i class="cooldown-mask"></i><strong class="cooldown-text"></strong><kbd>C</kbd><span class="skill-name">回春</span></button></div><div class="dodge-hint"><kbd>Space</kbd><span>闪避 · 35 耐力</span></div></section>
       <div class="xp-line"><i id="xp-fill"></i></div><div class="control-reminder"><span><kbd>W A S D</kbd> 移动</span><span>自动索敌 · 鼠标优先</span><span><kbd>F</kbd> 交互</span><span id="performance-readout"></span></div><div id="damage-layer"></div><div id="hurt-vignette"></div>
     `;
+    this.gearUI=new GameGearUI(this);
     this.hp = document.querySelector('#hp-fill'); this.energy = document.querySelector('#energy-fill'); this.stamina = document.querySelector('#stamina-fill');
     this.skillButtons = [...document.querySelectorAll('[data-skill]')];
     this.skillButtons.forEach(b => b.onclick = () => game.cast(Number(b.dataset.skill)));
     document.querySelector('#route-toggle').onclick=()=>this.toggleRoute();
     document.querySelector('#heal-button').onclick = () => game.heal();
+    document.querySelector('#shop-button').onclick=()=>this.shop();
     document.querySelector('#inventory-button').onclick = () => this.inventory(); document.querySelector('#pause-button').onclick = () => this.pause(); document.querySelector('#map-open').onclick = () => this.map();
     this.mapCanvas = document.querySelector('#minimap'); this.mapContext = this.mapCanvas.getContext('2d');this.atlas=new GameMap(game);
     for (const n of this.numbers) { n.element.className = 'damage-number'; n.element.hidden = true; document.querySelector('#damage-layer').append(n.element); }
@@ -61,10 +65,12 @@ export class GameUI {
     this.dialog.querySelector('#volume-setting').oninput = e => this.game.configure({ volume: Number(e.target.value) }); this.dialog.querySelector('#shake-setting').onchange = e => this.game.configure({ shake: e.target.checked }); this.dialog.querySelector('#camera-setting').onchange=e=>this.game.configure({skillCamera:e.target.checked});this.dialog.querySelector('#route-setting').onchange=e=>this.game.configure({route:e.target.checked});this.dialog.querySelector('#music-setting').onchange=e=>this.game.configure({musicMuted:!e.target.checked});this.dialog.querySelector('#settings-done').onclick = () => this.close();
   }
   tutorial() {
-    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级解锁 G 觉醒，全场追踪落雷。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / M / Esc</kbd><h3>整备与成长</h3><p>行囊装备遗物，地图查看目标。提升攻击力会强化光色、光晕并解锁多重弹道；灯台可休整和淬炼。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
+    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、提升三道修行。地图查看目标。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
     this.dialog.querySelector('#tutorial-done').onclick = () => this.close();
   }
-  inventory() {
+  inventory(){this.gearUI.inventory();}
+  shop(){this.gearUI.shop();}
+  relicInventory() {
     const s = this.state.save, stats = this.state.stats;
     const comparison=id=>{
       const item=ITEMS[id];if(s.equipment[item.slot]===id)return '';
@@ -102,8 +108,9 @@ export class GameUI {
   }
   camp() {
     const cost = 100 + this.state.save.boons.power * 65;
-    this.open(`<span class="kicker">SANCTUARY / 灯火长明</span><h1>在此，重整心神。</h1><p>生命、护罩、灵力与耐力已恢复。灯台已记录为新的归途。</p><div class="camp-upgrade">${itemIcon(2)}<div><h3>淬炼灵锋</h3><p>基础攻击 +12%，新增一枚灵锋与一次追击</p><strong>${cost} 灵石 · 持有 ${this.state.save.gold}</strong></div></div>${this.fervorPreview()}<div class="dialog-buttons"><button class="primary" id="camp-upgrade" ${this.state.save.gold < cost || this.state.growth.stacks>=MAX_FERVOR ? 'disabled' : ''}>${this.state.growth.stacks>=MAX_FERVOR?'锋芒圆满':`淬炼 · ${cost} 灵石`}</button><button id="camp-leave">继续旅途</button>${this.state.save.won ? '<button id="challenge-start">开启轮回 · 敌人更强，成长保留</button>' : ''}</div>`);
+    this.open(`<span class="kicker">SANCTUARY / 灯火长明</span><h1>在此，重整心神。</h1><p>生命、护罩、灵力与耐力已恢复。灯台已记录为新的归途。</p><div class="camp-upgrade">${itemIcon(2)}<div><h3>淬炼灵锋</h3><p>基础攻击 +12%，新增一枚灵锋与一次追击</p><strong>${cost} 灵石 · 持有 ${this.state.save.gold}</strong></div></div>${this.fervorPreview()}<div class="dialog-buttons"><button class="primary" id="camp-upgrade" ${this.state.save.gold < cost || this.state.growth.stacks>=MAX_FERVOR ? 'disabled' : ''}>${this.state.growth.stacks>=MAX_FERVOR?'锋芒圆满':`淬炼 · ${cost} 灵石`}</button><button id="camp-store">商会 · 强化 · 修行</button><button id="camp-leave">继续旅途</button>${this.state.save.won ? '<button id="challenge-start">开启轮回 · 敌人更强，成长保留</button>' : ''}</div>`);
     this.dialog.querySelector('#camp-upgrade').onclick = () => { if (this.state.upgrade()) { this.game.save(); this.game.audio.play('level'); this.camp(); } };
+    this.dialog.querySelector('#camp-store').onclick=()=>this.shop();
     this.dialog.querySelector('#camp-leave').onclick = () => this.close();
     if (this.state.save.won) this.dialog.querySelector('#challenge-start').onclick = () => this.game.challenge();
   }
@@ -135,6 +142,7 @@ export class GameUI {
       const merged=this.numbers.find(n=>n.enemyId===event.enemyId&&n.elementType===event.element&&n.age<((event.element==='halo'||event.fervor)?.32:.16));const n = merged || this.numbers.find(n => n.age > 1.1) || this.numbers[0];const damage=(merged?n.damage:0)+event.damage;Object.assign(n, { age: merged?n.age:0, enemyId:event.enemyId,elementType:event.element,damage, x: event.x, z: event.z, height:heightAt(event.x,event.z)+1.8*event.scale }); n.element.textContent = Math.round(damage); n.element.className = 'damage-number' + (event.critical ? ' critical' : ''); n.element.hidden = false;
     }
     if (['toast','clear','seal','wave','ascend','fervorUpgrade','vitalityUpgrade','spiritUpgrade'].includes(event.type)) this.toast(event.text);
+    if(event.type==='gearLoot'){const e=document.querySelector('#loot-toast'),item=event.item;e.innerHTML=gearIcon(item.slot)+`<div><small style="color:${GEAR_RARITIES[item.rarity].color}">获得${GEAR_RARITIES[item.rarity].name}装备</small><strong>${gearName(item)}</strong><span>按 I 查看穿戴与强化</span></div>`;e.classList.add('visible');this.lootTimer=5;}
     if (event.type === 'loot') { const item = ITEMS[event.id], e = document.querySelector('#loot-toast'); e.innerHTML = `${itemIcon(item.icon)}<div><small>获得${item.rarity}遗物</small><strong>${item.name}</strong><span>按 I 查看装备</span></div>`; e.classList.add('visible'); this.lootTimer = 5; }
     if (event.type === 'region') this.region(event.zone);
     if (event.type === 'camp') this.camp(); if (event.type === 'defeat') this.defeat();
@@ -164,11 +172,11 @@ export class GameUI {
       if(battle){const alive=this.state.enemies.filter(e=>e.encounter===battle.encounter.id&&e.hp>0);battleHUD.querySelector('span').textContent=`${battle.encounter.name} · 第 ${Math.max(1,battle.wave+1)} / ${battle.waves.length} 波`;battleHUD.querySelector('small').textContent=`敌境 Lv.${battle.encounter.level+s.challenge*2} · ${alive.length} 敌人${alive.some(e=>e.elite)?' · 精英 '+alive.filter(e=>e.elite).length:''}${battle.nextIn>=0?' · 援军将至':''}`;}
       [...this.skillButtons, document.querySelector('#heal-button')].forEach((b,i) => {
         const skill=SKILLS[i],time=skill?p.cooldowns[i]:p.potion,duration=skill?skill.cooldown*(1-stats.haste):18,locked=skill?.unlockLevel>s.level;
-        const hasTarget=i===3?this.state.enemies.some(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-p.x,e.z-p.z)<=32):!!this.state.lockedTarget;
-        const unavailable=!!skill&&(locked||p.energy<skill.cost||!hasTarget||time>.1);
-        b.querySelector('.cooldown-mask').style.height=`${time/duration*100}%`;b.querySelector('.cooldown-text').textContent=locked?'Lv.30':time>.1?time.toFixed(time<1?1:0):'';
+        const hasTarget=i>=3?this.state.enemies.some(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-p.x,e.z-p.z)<=32):!!this.state.lockedTarget;
+        const unavailable=!!skill&&(locked||(i>=3&&this.state.awakening.active)||p.energy<skill.cost||!hasTarget||time>.1);
+        b.querySelector('.cooldown-mask').style.height=`${time/duration*100}%`;b.querySelector('.cooldown-text').textContent=locked?`Lv.${skill.unlockLevel}`:time>.1?time.toFixed(time<1?1:0):'';
         b.classList.toggle('unavailable',unavailable);b.classList.toggle('locked',locked);b.setAttribute('aria-disabled',String(unavailable));
-        if(i===3)b.classList.toggle('awakening-ready',!unavailable);
+        if(i>=3)b.classList.toggle('awakening-ready',!unavailable);
       });
       const boss = this.state.boss, element = document.querySelector('.boss-status'); element.hidden = !boss || boss.hp <= 0; if (boss) { document.querySelector('#boss-fill').style.width = `${boss.hp / boss.maxHp * 100}%`; document.querySelector('#boss-phase').textContent = ['第一式 · 守界','第二式 · 星陨','终式 · 万象俱灭'][boss.phase]; }
     }

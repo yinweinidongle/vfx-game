@@ -1,0 +1,37 @@
+[
+  {
+    "name": "equipment-armor-v1",
+    "image": "assets/rpg-source/art/equipment/armor-v1.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-boots-v1",
+    "image": "assets/rpg-source/art/equipment/boots-v1.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-wings-v1",
+    "image": "assets/rpg-source/art/equipment/wings-v1.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-cloak-v1",
+    "image": "assets/rpg-source/art/equipment/cloak-v1.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-weapon-v1",
+    "image": "assets/rpg-source/art/equipment/weapon-v1.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  }
+]

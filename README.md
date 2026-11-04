@@ -56,6 +56,10 @@ Vite + Three.js + WebGL2 的原创 3D 技能实验室，包含可切换的 **修
 
 命中镜头覆盖主箭冲击与六支追踪箭的错峰冰爆，随后拉远展示余霜消散。
 
+## 星炉与新觉醒
+
+新增 35 级 **H · 天刃镇岳**、40 级 **J · 万象冰劫**，各有全屏职业立绘、运镜、实体巨刃/冰暴与真实范围伤害。按 **I** 管理五类普通/稀有/史诗装备，按 **B** 进入灯台商会购买、回收、修行与最高 **+20** 强化。穿戴改变角色实际外观与属性，强化光色连续从浅蓝进阶到金色；失败不掉级。兼容原本地存档。规则、操作与数值见 [装备与觉醒说明](docs/game/EQUIPMENT-AND-AWAKENINGS.md)，文生图/图生 3D 资产记录见 [素材制作](docs/game/EQUIPMENT-ART.md)。
+
 ## 霜界 · 归墟之门：单机动作 RPG
 
 页面顶部的 **进入霜界 RPG** 打开独立游戏，也可直接访问 `http://127.0.0.1:5173/game.html`。原技能实验室完整保留。
@@ -317,7 +321,7 @@ skill.fire();
 
 ### 线上访问
 
-[游戏主页](https://game.xqsingular.com/) · [技能实验室](https://game.xqsingular.com/index.html)。Nginx、HTTPS、自动续期、目录和回退方式见 [部署记录](deploy/README.md)。
+[游戏主页](https://game.xqsingular.com/) · [技能实验室](https://game.xqsingular.com/index.html)。静态构建支持现有服务器与 GitHub Pages，运行游戏无需生成 API。
 
 ## GitHub Pages
 

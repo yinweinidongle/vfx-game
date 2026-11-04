@@ -1,3 +1,4 @@
+import './gear-ui.css';
 import * as T from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -96,8 +97,10 @@ export class RPGGame {
       if(e.type==='spawn')this.actors.spawn(e.enemy);
       if(e.type==='attack'||e.type==='cast')this.actors.attack(e.index>=2);
       if(e.type==='cast')this.skillCamera.begin(e.index);
-      if(e.type==='awakening'){this.awakeningView.begin();this.audio.awaken(this.state.kind);}
+      if(e.type==='awakening'){this.awakeningView.begin(e);if(e.index===3)this.audio.awaken(this.state.kind);else this.audio.play(e.index===4?'slash':'frost');}
       if(e.type==='revive'||e.type==='defeat'){this.awakeningView.reset();this.audio.stopAwakening();this.state.awakening.reset();this.skillCamera.cancel();}
+      if(e.type==='heavenCleave'){this.shake=e.wave===0?.28:.13;this.hitStop=.045;this.audio.thunder(true);}
+      if(e.type==='glacialPulse'){this.shake=e.final?.2:.045;this.audio.play('frost');}
       if(e.type==='thunderStrike'){
         if(this.state.time-(this.lastThunderSound??-10)>.13){this.audio.thunder(e.wave===3);this.lastThunderSound=this.state.time;}
         this.shake=Math.max(this.shake,e.wave===3?.16:.055);

@@ -6,16 +6,18 @@ import { EncounterDirector } from './EncounterDirector.js';
 import { swordEvolution } from './SwordEvolution.js';
 import { sampleWorldCycle } from './WorldCycle.js';
 import { GameAwakening } from './GameAwakening.js';
-import { AWAKENING_LEVEL, AWAKENING_RANGE } from './AwakeningConfig.js';
+import { AWAKENING_RANGE } from './AwakeningConfig.js';
 import { vitalityGrowth, spiritGrowth, skillColor } from './CultivationGrowth.js';
+import { readGearSave, equippedGearStats } from './GearData.js';
+import { GameGear } from './GameGear.js';
 
-const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0 });
+const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0, gearBag:[],gearEquipped:{},nextGearId:1,gearPity:0,shopEpoch:0,shopBought:[],groundGear:[],nextLootId:1 });
 export function readSave(storage,key=SAVE_KEY) {
   try {
     const s = JSON.parse(storage.getItem(key));
     if (s?.version !== 1 || !CLASSES[s.kind]) return null;
     const d = fresh(s.kind);
-    for (const key of ['level', 'xp', 'gold', 'playTime', 'kills', 'deaths', 'challenge']) d[key] = clamp(Number(s[key]) || 0, key === 'level' ? 1 : 0, 100000);
+    for (const key of ['level', 'xp', 'gold', 'playTime', 'kills', 'deaths', 'challenge']) d[key] = clamp(Number(s[key]) || 0, key === 'level' ? 1 : 0, key==='gold'?1000000000:100000);
     d.pendingBoons=clamp(Math.floor(Number(s.pendingBoons)||0),0,50);
     d.level = clamp(d.level, 1, 50); d.won = s.won === true;
     d.seals = [s.seals?.[0] === true, s.seals?.[1] === true];
@@ -25,6 +27,7 @@ export function readSave(storage,key=SAVE_KEY) {
     for (const slot of ['charm', 'ring', 'arms']) if (d.inventory.includes(s.equipment?.[slot])&&ITEMS[s.equipment[slot]].slot===slot) d.equipment[slot] = s.equipment[slot];
     for (const b of BOONS) d.boons[b.id] = clamp(Math.floor(Number(s.boons?.[b.id]) || 0), 0, 50);
     if (INTERACTABLES.some(i => i.type === 'camp' && i.id === s.checkpoint)) d.checkpoint = s.checkpoint;
+    readGearSave(s,d);
     return d;
   } catch { return null; }
 }
@@ -32,13 +35,13 @@ export function readSave(storage,key=SAVE_KEY) {
 /** Deterministic combat simulation. No renderer, DOM or wall-clock dependencies. */
 export class GameState {
   constructor(kind = 'sword', save = null) {
-    this.save = save || fresh(kind); this.kind = this.save.kind;
+    this.save = save || fresh(kind); if(!this.save.gearBag)readGearSave(this.save,this.save);this.kind = this.save.kind;this.gear=new GameGear(this);
     this.cycle = sampleWorldCycle(this.save.playTime);
     this.time = 0; this.events = []; this.enemies = []; this.obstacles = [];
     this.projectiles = Array.from({ length: 96 }, (_, id) => ({ id, alive: false, hit: new Set() }));
     this.zones = Array.from({ length: 24 }, () => ({ alive: false }));
     this.haloVolley=new GameHaloVolley(this);this.fervorVolley=new GameFervorVolley(this);this.awakening=new GameAwakening(this);this.lockedTarget=null;
-    this.drops = []; this.pendingBoons = this.save.pendingBoons || 0; this.started = new Set(this.save.cleared);
+    this.drops = (this.save.groundGear||[]).filter(d=>isLand(d.x,d.z,.1)).map(d=>({...d,gear:{...d.gear},alive:true}));this.save.nextLootId ||= 1;this.save.groundGear ||= [];this.pendingBoons = this.save.pendingBoons || 0; this.started = new Set(this.save.cleared);
     this.encounters = new EncounterDirector(this);
     this.player = { x: -28, z: 22, yaw: 0, hp: 1, energy: 100, stamina: 100, invulnerable: 0, action: 'idle', actionTime: 0, cooldowns: SKILLS.map(()=>0), attackCooldown: 0, potion: 0, combat: 0, dash: 0, dashX: 0, dashZ: 0, combo: 0 };
     const camp = INTERACTABLES.find(i => i.id === this.save.checkpoint); this.player.x = camp.x; this.player.z = camp.z - 3;
@@ -53,17 +56,18 @@ export class GameState {
     this.vitality=vitalityGrowth(this.save.boons.vitality);this.spirit=spiritGrowth(this.save.boons.spirit);
     this.stats=this.statsFor();this.growth=attackGrowth(this.kind,this.stats.damage,CLASSES[this.kind].damage,this.save.boons.power);
     this.player.shield=Math.min(this.vitality.capacity,(this.player.shield||0)+Math.max(0,this.vitality.capacity-(oldShield?.capacity||0)));
-    this.player.energy=oldSpirit?Math.min(this.stats.energyMax,this.player.energy+Math.max(0,this.stats.energyMax-oldSpirit.energyMax)):this.stats.energyMax;
+    this.player.energy=oldSpirit?Math.min(this.stats.energyMax,this.player.energy+Math.max(0,this.spirit.energyMax-oldSpirit.energyMax)):this.stats.energyMax;
+    this.player.hp=Math.min(this.player.hp,this.stats.hp);
     if(oldShield&&this.vitality.level>oldShield.level)this.emit('vitalityUpgrade',{text:`长生 ${this.vitality.level} 层 · 护罩可吸收 ${this.vitality.capacity} 点伤害`});
     if(oldSpirit&&this.spirit.level>oldSpirit.level)this.emit('spiritUpgrade',{text:`灵息 ${this.spirit.level} 层 · ${this.spirit.name} · 灵力上限 ${this.stats.energyMax}`});
     if (previous && this.growth.tier > previous.tier) this.emit('ascend', { ...this.growth, x: this.player.x, z: this.player.z, text: `攻势觉醒 · ${this.growth.name} · ${this.growth.shots} 重追击` });
     if(previous&&this.growth.stacks>previous.stacks)this.emit('fervorUpgrade',{from:previous.stacks,stacks:this.growth.stacks,finishTier:this.growth.finishTier,text:`锋芒 ${this.growth.stacks} 层 · 新增一枚${this.growth.spiritName} · ${this.growth.echoes} 道追击${this.growth.finishTier>previous.finishTier?' · 终结爆发进阶':''}`});
   }
-  statsFor(equipment=this.save.equipment) {
+  statsFor(equipment=this.save.equipment,gearEquipped=this.save.gearEquipped) {
     const c = CLASSES[this.kind], b = this.save.boons, items = Object.values(equipment).map(id => ITEMS[id]).filter(Boolean);
     const sum = k => items.reduce((n, i) => n + (i[k] || 0), 0);
-    const spirit=spiritGrowth(b.spirit);
-    return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality'), damage: c.damage * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier, energyMax:spirit.energyMax, speed: c.speed };
+    const spirit=spiritGrowth(b.spirit),gear=equippedGearStats(this.save,gearEquipped);
+    return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality')+gear.hp, damage: (c.damage+gear.damage) * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier+gear.regen, energyMax:spirit.energyMax+gear.energyMax, speed: c.speed*(1+Math.min(.65,gear.speed)),attackSpeed:1+Math.min(1.4,gear.attackSpeed) };
   }
   write(storage) { try { storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
   objective() {
@@ -112,7 +116,7 @@ export class GameState {
   attack(aimX, aimZ) {
     const p = this.player; if (this.dead || p.attackCooldown > 0 || p.dash > 0 || (this.awakening.active&&this.awakening.age<.5)) return false;
     const target=this.aimTarget(aimX,aimZ,24),yaw=Math.atan2((target?.x??aimX)-p.x,(target?.z??aimZ)-p.z);this.lockedTarget=target;p.yaw=yaw;p.combo=(p.combo+1)%3;
-    p.action = 'attack'; p.actionTime = 0; p.attackCooldown = (this.kind === 'sword' ? .48 : .55) / (1 + this.growth.tier * .045);
+    p.action = 'attack'; p.actionTime = 0; p.attackCooldown = (this.kind === 'sword' ? .48 : .55) / ((1 + this.growth.tier * .045)*this.stats.attackSpeed);
     this.volley(this.kind==='sword'?'slash':this.kind==='ice'?'arrow':'spirit',target,yaw,this.stats.damage*(this.kind==='sword'&&p.combo===0?1.2:1),true);
     this.fervorVolley.request(target);
     this.emit('attack', { kind: this.kind, tier:this.growth.tier, color:this.growth.color }); return true;
@@ -128,15 +132,15 @@ export class GameState {
   cast(index, aimX, aimZ) {
     const p = this.player, skill = SKILLS[index];
     if (!skill || this.dead || p.dash > 0 || p.cooldowns[index] > 0 || (this.awakening.active&&this.awakening.age<.5)) return false;
-    if(skill.unlockLevel&&this.save.level<skill.unlockLevel){this.emit('toast',{text:`角色达到 ${AWAKENING_LEVEL} 级后，解锁 G · 雷霆觉醒。`});return false;}
-    if(index===3&&this.awakening.active)return false;
-    const target=index===3?this.enemies.filter(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&distance(e,p)<=AWAKENING_RANGE).sort((a,b)=>distance(a,p)-distance(b,p))[0]:this.aimTarget(aimX,aimZ,26);
+    if(skill.unlockLevel&&this.save.level<skill.unlockLevel){this.emit('toast',{text:`角色达到 ${skill.unlockLevel} 级后，解锁 ${skill.key} · ${skill.name}。`});return false;}
+    if(index>=3&&this.awakening.active)return false;
+    const target=index>=3?this.enemies.filter(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&distance(e,p)<=AWAKENING_RANGE).sort((a,b)=>distance(a,p)-distance(b,p))[0]:this.aimTarget(aimX,aimZ,26);
     if(!target){this.emit('toast',{text:'附近暂无可攻击的敌人，技能与灵力已保留。'});return false;}
     this.lockedTarget=target;aimX=target.x;aimZ=target.z;
     if (p.energy < skill.cost) { this.emit('toast', { text: '灵力不足，普通攻击与时间流逝可以恢复灵力。' }); return false; }
     p.energy -= skill.cost;p.regenLock=1.4; p.cooldowns[index] = skill.cooldown * (1 - this.stats.haste);
     p.yaw = Math.atan2(aimX - p.x, aimZ - p.z); p.action = index >= 2 ? 'cast' : 'attack'; p.actionTime = 0;
-    if(index===3){p.invulnerable=Math.max(p.invulnerable,.65);p.attackCooldown=Math.max(p.attackCooldown,.5);this.awakening.begin();}
+    if(index>=3){p.invulnerable=Math.max(p.invulnerable,.65);p.attackCooldown=Math.max(p.attackCooldown,.5);this.awakening.begin(index);}
     else if (index < 2) {
       this.volley(skill.id,target,p.yaw,this.stats.damage*(index===0?2.3:3.3)*this.spirit.damage);
     } else {
@@ -176,7 +180,7 @@ export class GameState {
     this.emit('hit', { x: enemy.x, z: enemy.z, damage, critical, element, scale: enemy.scale,enemyId:enemy.id,primary:style?.primary,color:style?.color,radiance:style?.radiance,tier:style?.tier??this.growth.tier,echo:style?.echo,fervor:style?.fervor,finisher:style?.finisher,finishTier:style?.finishTier,finishRadius:style?.finishRadius,fervorSplash:style?.fervorSplash,spiritLevel:style?.spiritLevel||0,skillStage:style?.skillStage||0,skillAccent:style?.skillAccent });
     if (enemy.hp === 0) {
       enemy.state = 'dead'; this.save.kills++; this.save.gold += enemy.type === 'boss' ? 200 : Math.round(enemy.xp * .45); this.gainXP(enemy.xp);
-      this.drops.push({ x: enemy.x, z: enemy.z, age: 0, alive: true }); this.emit('death', { enemy });
+      this.drops.push({ x: enemy.x, z: enemy.z, age: 0, alive: true });this.gear.drop(enemy); this.emit('death', { enemy });
       this.encounters.onDeath(enemy);
       this.saveDirty = true;
     }
@@ -191,7 +195,7 @@ export class GameState {
   }
   gainXP(xp) {
     this.save.xp += xp;
-    while (this.save.level < 50 && this.save.xp >= this.save.level * 95) { this.save.xp -= this.save.level * 95; this.save.level++; this.pendingBoons++; this.save.pendingBoons=this.pendingBoons; this.saveDirty=true; this.recalculate(); this.player.hp = this.stats.hp; this.emit('level');if(this.save.level===AWAKENING_LEVEL)this.emit('awakeningUnlocked',{text:'觉醒已至 · G 技能解锁：雷霆将响应你的号令。'}); }
+    while (this.save.level < 50 && this.save.xp >= this.save.level * 95) { this.save.xp -= this.save.level * 95; this.save.level++; this.pendingBoons++; this.save.pendingBoons=this.pendingBoons; this.saveDirty=true; this.recalculate(); this.player.hp = this.stats.hp; this.emit('level');const unlocked=SKILLS.find(k=>k.unlockLevel===this.save.level);if(unlocked)this.emit('awakeningUnlocked',{text:`觉醒已至 · ${unlocked.key} · ${unlocked.name} 已解锁。`}); }
     if (this.save.level === 50) this.save.xp = Math.min(this.save.xp, 50 * 95);
   }
   chooseBoon(id) {
@@ -273,9 +277,10 @@ export class GameState {
     for (const d of this.drops) if (d.alive) {
       d.age += dt; const len = distance(d, p);
       if (len < 7) { const t = Math.min(1, dt * (2 + d.age * 2)); d.x += (p.x - d.x) * t; d.z += (p.z - d.z) * t; }
-      if (len < .6) { d.alive = false; p.hp = Math.min(this.stats.hp, p.hp + 4); p.energy = Math.min(this.stats.energyMax, p.energy + 2); this.emit('pickup'); }
-      if (d.age > 20) d.alive = false;
+      if (len < (d.gear?1.2:.6)) { d.alive = false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}else{p.hp = Math.min(this.stats.hp, p.hp + 4); p.energy = Math.min(this.stats.energyMax, p.energy + 2);}this.emit('pickup'); }
+      if(d.age>(d.gear?120:20)){d.alive=false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}}
     }
+    if(this.drops.length>192)this.drops=this.drops.filter(d=>d.alive);
     let near = null, best = 3;
     for (const o of INTERACTABLES) if (!(o.type === 'chest' && this.save.opened.includes(o.id)) && !(o.type === 'seal' && this.save.seals[o.seal])) {
       const d = distance(p, o); if (d < best) { best = d; near = o; }

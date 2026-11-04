@@ -84,3 +84,7 @@ npm run build
 - 语音的音色、原文、表演指令见 [awakening-voices.json](awakening-voices.json)。生成脚本 `scripts/generate-awakening-voices.py` 通过调用者环境变量或不回显输入读取密钥，只在制作时调用服务；网页仅加载成品音频，没有生成服务凭据。
 - 接口依据：[豆包 HTTP V3 文档](https://docs.volcengine.com/docs/doubao-voice/http-chunked-sse-unidirectional-streaming-v3?lang=zh)、[官方音色表](https://docs.volcengine.com/docs/doubao-voice/tone-list-3?lang=zh)。三音色均从官方列表核对；没有使用声音复刻或指定真人仿声。
 
+
+## 星炉装备与冰劫（2026-11-04）
+
+本轮新增五件 ImageGen → Seed3D 装备、对应图标与冰暴纹理图集。模型已完成约 1 万三角形/件的优化，并在游戏穿戴与巨刃技能中实际使用。见 [完整提示词、任务与优化记录](EQUIPMENT-ART.md)。

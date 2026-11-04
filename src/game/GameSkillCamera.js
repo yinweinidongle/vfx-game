@@ -11,20 +11,27 @@ export class GameSkillCamera{
   begin(index){
     if(this.game.settings.skillCamera===false)return;
     const p=this.game.state.player,target=this.game.state.lockedTarget;
-    this.age=0;this.duration=index===3?4.85:index===2?4.15:T.MathUtils.clamp(Math.hypot((target?.x??p.x)-p.x,(target?.z??p.z)-p.z)/24/(index===0?.52:.6)+.4,1.22,2.45);this.index=index;this.cancelled=false;this.trackedHalo=null;
+    this.age=0;this.duration=index>=3?(index===5?6.05:index===4?4.55:4.85):index===2?4.15:T.MathUtils.clamp(Math.hypot((target?.x??p.x)-p.x,(target?.z??p.z)-p.z)/24/(index===0?.52:.6)+.4,1.22,2.45);this.index=index;this.cancelled=false;this.trackedHalo=null;
     this.origin.set(p.x,heightAt(p.x,p.z)+1.2,p.z);this.target.set(target?.x??p.x,heightAt(target?.x??p.x,target?.z??p.z)+1.3,target?.z??p.z);
     this.closeRange=this.origin.distanceTo(this.target)<6;
     this.forward.set(Math.sin(p.yaw),0,Math.cos(p.yaw));this.side.set(this.forward.z,0,-this.forward.x);
     this.bolt=this.game.state.projectiles.find(b=>b.alive&&!b.primary&&b.kind===(index===0?'frost':'slash')&&b.age<.15);
   }
   cancel(){if(this.age<this.duration&&!this.cancelled){this.cancelled=true;this.age=Math.max(this.age,this.duration-.25);}}
-  get timeScale(){return this.index===3?1:!this.cancelled&&this.age<this.duration-.25?(this.index===0?.52:this.index===1?.6:this.age<.85?.85:1):1;}
+  get timeScale(){return this.index>=3?1:!this.cancelled&&this.age<this.duration-.25?(this.index===0?.52:this.index===1?.6:this.age<.85?.85:1):1;}
   update(dt,normalEye,normalTarget){
     this.age+=dt;const t=this.age,g=this.game;let fov=44;
     if(g.settings.skillCamera===false)this.cancel();
     if(t<this.duration){
       const weight=T.MathUtils.smoothstep(t,0,.14)*(1-T.MathUtils.smoothstep(t,this.duration-.28,this.duration));this.weight=weight;
-      if(this.index===3){
+      if(this.index===4||this.index===5){
+        const a=g.state.awakening,blade=this.index===4,reveal=T.MathUtils.smoothstep(t,.5,1.6);
+        this.focus.set(a.cx??this.target.x,heightAt(a.cx??this.target.x,a.cz??this.target.z)+(blade?7.5-reveal*5.:1.8),a.cz??this.target.z);
+        const orbit=blade?0:Math.max(0,t-1.4)*.12;
+        this.eye.copy(this.focus).addScaledVector(this.side,(blade?19:18)*Math.cos(orbit)).addScaledVector(this.forward,(blade?-19:-15)+Math.sin(orbit)*10);
+        this.eye.y+=blade?5+reveal*13:5+reveal*18;fov=blade?52:53;
+        this.label=awakeningStyle(g.state.kind,this.index).name+(t<1.25?' · 觉醒':blade?' · 天刃降临':' · 冰劫领域');
+      }else if(this.index===3){
         const pull=T.MathUtils.smoothstep(t,.6,1.6),orbit=Math.max(0,t-1.6)*.045;
         this.focus.copy(this.origin).lerp(this.target,pull*.35);this.focus.y=heightAt(this.focus.x,this.focus.z)+1.1;
         this.eye.copy(this.focus).addScaledVector(this.forward,5.2-pull*21).addScaledVector(this.side,2+pull*15+orbit*9);this.eye.y+=1.1+pull*27;

@@ -1,3 +1,5 @@
+import { GameAscendantVFX } from './GameAscendantVFX.js';
+import { GameLootVFX } from './GameLootVFX.js';
 import * as T from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { GameProjectileTrails } from './GameProjectileTrails.js';
@@ -54,7 +56,7 @@ export class GameFX {
     this.installSpirit();
     this.haloBolts=new HaloBolts(this.group,camera,defaults,state.haloVolley.bolts.length);this.haloBolts.events=state.haloVolley.bolts;
     this.light = new T.PointLight('#73dcff', 0, 9, 2); this.group.add(this.light); this.lightAge = 0;
-    this.thunder=new GameThunderVFX(scene,camera,state);this.ready=Promise.all([this.ready,this.thunder.ready]);
+    this.ascendant=new GameAscendantVFX(scene,camera,state,actors.gearTemplates.weapon);this.loot=new GameLootVFX(scene,state);this.thunder=new GameThunderVFX(scene,camera,state);this.ready=Promise.all([this.ready,this.thunder.ready,this.ascendant.ready]);
   }
   makeRings() {
     const g = new T.PlaneGeometry(2, 2); this.ringAges = new Float32Array(36); this.ringKinds = new Float32Array(36);this.ringColors=new Float32Array(108);
@@ -112,7 +114,7 @@ export class GameFX {
     this.light.position.set(x, heightAt(x, z) + 2, z); this.light.color.copy(color); this.lightAge = .2;
   }
   handle(event) {
-    this.thunder.handle(event);
+    this.thunder.handle(event);this.ascendant.handle(event);
     this.spiritBolts?.handle(event);
     this.fervor.handle(event);this.shield.handle(event);this.resonance.handle(event);
     if(event.type==='revive'){this.divineAge=100;this.projectileTrails.reset();for(const slot of this.bladePool){slot.trail.reset();slot.projectile=null;slot.group.visible=false;}for(const b of this.bursts)b.alive=false;for(const p of this.shards)p.alive=false;this.melee=null;}
@@ -136,7 +138,7 @@ export class GameFX {
     }
   }
   update(dt) {
-    this.thunder.update(dt);
+    this.thunder.update(dt);this.ascendant.update(dt);this.loot.update();
     const t=this.state.time;this.blade.group.visible=false;this.haloBolts.update(t);this.projectileTrails.update(dt,t,this.state.projectiles);
     this.spiritBolts?.update(dt);
     this.fervor.update(dt);this.shield.update(dt);this.resonance.update(dt);
@@ -207,7 +209,7 @@ export class GameFX {
     this.warnings.count = count; this.warnings.instanceMatrix.needsUpdate = true; this.warnings.geometry.attributes.aProgress.needsUpdate = true;
   }
   dispose() {
-    this.thunder.dispose();
+    this.thunder.dispose();this.ascendant.dispose();this.loot.dispose();
     this.spiritBolts?.dispose();
     this.shield.dispose();this.resonance.dispose();this.fervor.dispose();this.projectileTrails.dispose();for(const s of this.bladePool)s.trail.dispose();this.blade.dispose(); this.storm.dispose(); this.portal.dispose(); this.targetSeal.dispose(); this.halo?.dispose();this.haloBolts.dispose();
     const geometries = new Set(), materials = new Set(); this.group.traverse(o => { if (o.geometry) geometries.add(o.geometry); if (o.material) for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m); });

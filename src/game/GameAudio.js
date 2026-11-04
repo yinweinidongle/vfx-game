@@ -32,6 +32,8 @@ export class GameAudio {
   play(type) {
     if (type === 'attack') { this.sweep(.22,3400,350,1.8);this.tone(150,.1,.03,'triangle',.4); }
     if (type === 'hit') { this.sweep(.13,2400,700,1.8);this.tone(110, .14, .13, 'triangle', .45); this.tone(1900, .12, .025, 'sine', .75); }
+    if(type==='slash'){this.sweep(.9,180,4800,2.5);this.tone(110,.9,.16,'triangle',.45);}
+    if(type==='frost'){this.sweep(.5,5500,1600,1.4,'highpass');this.tone(1568,.7,.055,'sine',.6);}
     if (type === 'cast') { this.sweep(.5,500,4000,1.2);this.tone(260, .55, .08, 'triangle', 2); this.tone(780, .4, .05, 'sine', .7); }
     if (type === 'dodge') this.sweep(.23,1400,160,1.5);
     if(type==='shieldHit'){this.tone(640,.18,.055,'sine',1.4);this.sweep(.13,2800,1100,.65);}

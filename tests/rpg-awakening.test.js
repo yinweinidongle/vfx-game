@@ -19,7 +19,7 @@ test('G unlocks exactly at 30, old saves inherit it, and failed casts never cons
   const s=arena('ice',29),energy=s.player.energy;
   assert.equal(s.cast(3,-28,13),false);assert.equal(s.player.energy,energy);assert.equal(s.player.cooldowns[3],0);
   s.gainXP(29*95);assert.equal(s.save.level,30);assert.equal(s.events.filter(e=>e.type==='awakeningUnlocked').length,1);
-  const loaded=new GameState('ice',readSave({getItem:()=>JSON.stringify(s.save)}));assert.equal(loaded.player.cooldowns.length,4);assert.equal(loaded.save.level,30);
+  const loaded=new GameState('ice',readSave({getItem:()=>JSON.stringify(s.save)}));assert.equal(loaded.player.cooldowns.length,SKILLS.length);assert.equal(loaded.save.level,30);
   assert.equal(loaded.cast(3,0,0),false);assert.equal(loaded.player.energy,100);
   s.player.energy=89;assert.equal(s.cast(3,-28,13),false);assert.equal(s.player.energy,89);
   s.player.energy=100;s.enemies.forEach(e=>e.spawnGrace=1);assert.equal(s.cast(3,-28,13),false);assert.equal(s.player.energy,100);

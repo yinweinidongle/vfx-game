@@ -1,4 +1,4 @@
-import { heightAt, isLand } from './GameData.js';
+import { heightAt, isLand,segmentDistance } from './GameData.js';
 import { AWAKENING_DURATION, AWAKENING_RANGE, awakeningStyle } from './AwakeningConfig.js';
 
 /** Four bounded strike waves. Visuals and damage share the same actual impact positions. */
@@ -6,11 +6,16 @@ export class GameAwakening {
   constructor(state) {
     this.state=state;this.active=false;this.age=0;this.generation=0;
     this.strikes=Array.from({length:192},(_,id)=>({id,active:false,hit:false,warned:false}));
-    this.hitByWave=Array.from({length:4},()=>new Set());this.count=0;
+    this.hitByWave=Array.from({length:9},()=>new Set());this.count=0;
   }
   eligible(e) { return e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-this.x,e.z-this.z)<=AWAKENING_RANGE; }
-  begin() {
-    const s=this.state,p=s.player;this.reset();this.active=true;this.generation++;this.x=p.x;this.z=p.z;this.yaw=p.yaw;this.damage=s.stats.damage*s.spirit.damage;this.style=awakeningStyle(s.kind);
+  begin(index=3) {
+    const s=this.state,p=s.player;this.reset();this.active=true;this.index=index;this.generation++;this.x=p.x;this.z=p.z;this.yaw=p.yaw;this.damage=s.stats.damage*s.spirit.damage;this.style=awakeningStyle(s.kind,index);
+    this.duration=this.style.duration||AWAKENING_DURATION;
+    if(index>=4){
+      this.target=s.lockedTarget;this.cx=this.target?.x??p.x;this.cz=this.target?.z??p.z;this.pulse=0;this.marked=false;this.locked=false;
+      s.emit('awakening',{index,kind:s.kind,x:this.x,z:this.z,targetX:this.cx,targetZ:this.cz,yaw:p.yaw,...this.style});return;
+    }
     // Snapshot the invocation power, then track moving enemies only until each strike lands.
     this.targets=s.enemies.filter(e=>this.eligible(e)).slice(0,32);
     for(const hits of this.hitByWave)hits.clear();
@@ -23,7 +28,7 @@ export class GameAwakening {
         if(isLand(x,z,.2))this.add(x,z,.62+wave*.76+i*.026,wave,null,wave===3?1.3:.8);
       }
     }
-    s.emit('awakening',{kind:s.kind,x:this.x,z:this.z,yaw:p.yaw,color:this.style.color,name:this.style.name,line:this.style.line});
+    s.emit('awakening',{index,kind:s.kind,x:this.x,z:this.z,yaw:p.yaw,color:this.style.color,name:this.style.name,line:this.style.line});
   }
   add(x,z,at,wave,target,power) {
     if(this.count>=this.strikes.length)return;
@@ -31,6 +36,7 @@ export class GameAwakening {
   }
   update(dt) {
     if(!this.active)return;if(this.state.dead){this.reset();return;}this.age+=dt;
+    if(this.index>=4){this.updateAscendant();return;}
     for(let i=0;i<this.count;i++){
       const strike=this.strikes[i];if(strike.hit)continue;
       if(strike.target?.hp>0&&this.eligible(strike.target)){strike.x=strike.target.x;strike.z=strike.target.z;strike.y=heightAt(strike.x,strike.z);}
@@ -45,6 +51,33 @@ export class GameAwakening {
       this.state.emit('thunderStrike',{x:strike.x,y:strike.y,z:strike.z,wave:strike.wave,power:strike.power,color:this.style.color,accent:this.style.accent,seed:strike.id+this.generation*37});
     }
     if(this.age>=AWAKENING_DURATION){this.active=false;this.state.emit('awakeningEnd');}
+  }
+  updateAscendant(){
+    const s=this.state,t=this.age,blade=this.index===4,lockAt=blade?.92:.75;
+    if(!this.locked&&this.target?.hp>0&&this.eligible(this.target)){this.cx=this.target.x;this.cz=this.target.z;this.yaw=Math.atan2(this.cx-this.x,this.cz-this.z);}
+    if(t>=lockAt)this.locked=true;
+    // Telegraph and rendered effect use this same, eventually locked, anchor.
+    if(!this.marked&&t>=.12){this.marked=true;s.emit('ascendantField',{index:this.index,x:this.cx,y:heightAt(this.cx,this.cz),z:this.cz,yaw:this.yaw,radius:blade?4:10.5});}
+    if(blade){
+      while(this.pulse<2&&t>=[1.25,2.02][this.pulse]){
+        const wave=this.pulse++,half=7,dx=Math.sin(this.yaw)*half,dz=Math.cos(this.yaw)*half;
+        for(const e of s.enemies){if(!this.eligible(e)||segmentDistance(e.x,e.z,this.cx-dx,this.cz-dz,this.cx+dx,this.cz+dz)>4+e.scale*.25)continue;
+          s.hit(e,this.damage*(wave===0?8.8:3.2),'awakening',{color:this.style.color,radiance:2,skillAccent:this.style.accent});e.stagger=Math.max(e.stagger,.6);
+        }
+        s.emit('heavenCleave',{x:this.cx,y:heightAt(this.cx,this.cz),z:this.cz,yaw:this.yaw,wave,color:this.style.color});
+      }
+    }else{
+      while(this.pulse<9&&t>=1.12+this.pulse*.38){
+        const wave=this.pulse++,final=wave===8;let count=0;
+        for(const e of s.enemies){if(!this.eligible(e)||Math.hypot(e.x-this.cx,e.z-this.cz)>10.5+e.scale*.25)continue;
+          s.hit(e,this.damage*(final?4.8:1.05),'awakening',{color:this.style.color,radiance:1.7,skillAccent:this.style.accent});
+          e.frozen=Math.max(e.frozen,e.type==='boss'?.16:e.elite?.3:.6);
+          if(count++<40)s.emit('glacialStrike',{x:e.x,y:heightAt(e.x,e.z),z:e.z,wave,seed:e.id+wave*71+this.generation*137,final});
+        }
+        s.emit('glacialPulse',{x:this.cx,y:heightAt(this.cx,this.cz),z:this.cz,wave,final,radius:10.5});
+      }
+    }
+    if(t>=this.duration){this.active=false;s.emit('awakeningEnd');}
   }
   reset(){this.active=false;this.age=0;this.count=0;for(const strike of this.strikes){strike.active=false;strike.hit=true;}for(const hits of this.hitByWave)hits.clear();}
 }

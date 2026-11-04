@@ -1,0 +1,22 @@
+{
+  "armor": {
+    "sourceTriangles": 999952,
+    "triangles": 9998
+  },
+  "boots": {
+    "sourceTriangles": 999904,
+    "triangles": 9996
+  },
+  "wings": {
+    "sourceTriangles": 998829,
+    "triangles": 9998
+  },
+  "cloak": {
+    "sourceTriangles": 999613,
+    "triangles": 9990
+  },
+  "weapon": {
+    "sourceTriangles": 385676,
+    "triangles": 10000
+  }
+}

@@ -11,8 +11,10 @@ export class GameInput {
       if (e.code === 'Space') game.state.dodge(this.dx,this.dz);
       if (e.code === 'KeyQ') game.cast(0); if (e.code === 'KeyE') game.cast(1); if (e.code === 'KeyR') game.cast(2);
       if (e.code === 'KeyG') { e.preventDefault(); game.cast(3); }
+      if(e.code==='KeyH')game.cast(4);if(e.code==='KeyJ')game.cast(5);
       if (e.code === 'KeyV') game.ui.toggleRoute();
       if (e.code === 'KeyF') game.state.interact(); if (e.code === 'KeyC') game.heal();
+      if(e.code==='KeyB')game.ui.shop();
       if (e.code === 'KeyI') game.ui.inventory(); if (e.code === 'KeyM') game.ui.map();
     }, opts);
     window.addEventListener('keyup', e => this.keys.delete(e.code), opts); window.addEventListener('blur', () => this.clear(), opts);

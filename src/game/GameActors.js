@@ -1,3 +1,4 @@
+import { GameGearAppearance } from './GameGearAppearance.js';
 import * as T from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -35,11 +36,13 @@ export class GameActors {
       fetch(`${base}game/models/enemy-motion.json`).then(r => r.json()).then(data => { this.motion.enemy = data.map(c => T.AnimationClip.parse(c)); }),
     ];
     for (const [id, file] of [['sword','storm-sword-v3'], ['bow','frost-bow-v2'], ['arrow','frost-arrow-v2']]) jobs.push(gltf.loadAsync(`${base}game/models/${file}.glb`).then(g => { this.assets[id] = g.scene; this.templates.push(g.scene); }));
-    await Promise.all([...jobs,texturesReady]); this.player = this.create(this.playerSource, this.motion[kind], 2.1, null);
+    const gearJob=GameGearAppearance.load().then(models=>{this.gearTemplates=models;this.templates.push(...Object.values(models));});
+    await Promise.all([...jobs,gearJob,texturesReady]); this.player = this.create(this.playerSource, this.motion[kind], 2.1, null);
     this.addWeapon(this.player, kind === 'ice' ? 'bow' : kind === 'sword' ? 'sword' : null);
     this.weaponMaterials=[];this.growthTint=new T.Color();
     this.player.weapon?.traverse(o=>{if(!o.isMesh)return;const own=m=>{const c=m.clone();this.weaponMaterials.push(c);return c;};o.material=Array.isArray(o.material)?o.material.map(own):own(o.material);});
     this.templates.push(this.playerSource, this.enemySource);
+    this.gearAppearance=new GameGearAppearance(this.player,this.state,this.gearTemplates);
   }
   prepare(root) {
     root.traverse(o => {
@@ -110,8 +113,8 @@ export class GameActors {
   }
   attack(cast = false) {
     const view = this.player; if (!view) return;
-    if (view.current === 'attack') { view.active.reset().play(); return; }
-    this.switch(view, 'attack', .07); view.active.setEffectiveTimeScale(view.active.getClip().duration / (cast ? 1.2 : .65));
+    if (view.current === 'attack') { view.active.reset().play();view.active.setEffectiveTimeScale(view.active.getClip().duration/(cast?1.2:.65/this.state.stats.attackSpeed));return; }
+    this.switch(view, 'attack', .07); view.active.setEffectiveTimeScale(view.active.getClip().duration / (cast ? 1.2 : .65/this.state.stats.attackSpeed));
   }
   spawn(enemy) {
     const view = this.create(this.enemySource, this.motion.enemy, 2.2, enemy); view.group.scale.setScalar(enemy.scale);
@@ -126,8 +129,9 @@ export class GameActors {
     view.group.rotation.y+=turn*(1-Math.exp(-dt*(p.action==='attack'?35:18)));view.archerRig?.restore();view.mixer.update(dt);
     view.pivot.rotation.z = p.dash > 0 ? -.25 : T.MathUtils.damp(view.pivot.rotation.z, 0, 12, dt);
     view.archerRig?.update();
+    this.gearAppearance?.update();
     this.growthTint.set(this.state.growth.color);
-    for(const m of this.weaponMaterials)if(m.emissive){m.emissive.copy(this.growthTint);m.emissiveIntensity=this.state.growth.tier*(p.action==='attack'?.3:.09);}
+    for(const m of this.weaponMaterials)if(m.emissive){m.emissive.copy(this.growthTint);m.emissiveIntensity=this.state.growth.tier*(p.action==='attack'?.3:.09);if(this.gearAppearance?.weaponStyle){const f=this.gearAppearance.weaponStyle;m.emissive.set(f.from).lerp(this.growthTint.set(f.to),f.mix);m.emissiveIntensity+=f.power*.32;}}
     for (const m of view.materials) if (m.emissive) m.emissive.setRGB(p.hurtFlash > 0 ? .16 : 0, 0, 0);
     for (const [id, v] of this.enemies) {
       const e = this.state.enemies[id];
@@ -155,7 +159,7 @@ export class GameActors {
     v.model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.dispose();});
   }
   dispose() {
-    this.nightEyes.dispose();
+    this.nightEyes.dispose();this.gearAppearance?.dispose();
     const views = [this.player, ...this.enemies.values()].filter(Boolean);
     for (const v of views) this.release(v);
     this.weaponMaterials?.forEach(m=>m.dispose());
