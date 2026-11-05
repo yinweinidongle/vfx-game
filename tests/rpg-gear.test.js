@@ -33,7 +33,7 @@ test('merchant transactions recheck safety, cash, sold stock and bag capacity; p
  const saved=readSave({getItem:()=>JSON.stringify(s.save)}),loaded=new GameState('sword',saved);assert.equal(loaded.gear.buy(offer.stockId),false);
  loaded.player.x=50;assert.equal(loaded.gear.buy(loaded.gear.stock()[1].stockId),false);assert.equal(loaded.gear.enhance(loaded.save.gearBag[0].uid).ok,false);assert.equal(loaded.gear.cultivate('power'),false);
  s.save.gold=0;assert.equal(s.gear.buy(s.gear.stock()[1].stockId),false);s.save.gold=100000;
- while(s.save.gearBag.length<GEAR_CAPACITY)add(s,'armor');const full=s.save.gold;assert.equal(s.gear.buy(s.gear.stock()[1].stockId),false);assert.equal(s.save.gold,full);assert.equal(add(s,'weapon'),null);assert.ok(s.save.gold>full,'overflow loot converts to currency');
+ while(s.save.gearBag.length<GEAR_CAPACITY)add(s,'armor');const full=s.save.gold;assert.equal(s.gear.buy(s.gear.stock()[1].stockId),false);assert.equal(s.save.gold,full);const replacement=add(s,'weapon');assert.ok(replacement,'a rare item replaces the only unprotected common item');assert.ok(s.save.gold>full);assert.equal(s.save.gearBag.length,GEAR_CAPACITY);assert.equal(add(s,'armor'),null,'equal-quality overflow still converts to currency');
  s.save.playTime=301;assert.ok(!s.gear.stock()[0].sold);assert.ok(s.gear.cultivate('power'));assert.equal(s.save.boons.power,1);assert.equal(s.gear.cultivate('invalid'),false);
 });
 

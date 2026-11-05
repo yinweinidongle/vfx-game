@@ -4,7 +4,7 @@ export class GameInput {
     this.mouse = { x: 0, y: 0 }; this.pointerKnown = false; this.abort = new AbortController(); const opts = { signal: this.abort.signal };
     window.addEventListener('keydown', e => {
       if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-      if (e.code === 'Escape') { if (!game.ui) return; if (!game.ui.dialog.open) { e.preventDefault(); game.ui.pause(); } return; }
+      if (e.code === 'Escape') { if (!game.ready || !game.ui || game.saveBlocked) return; if (!game.ui.dialog.open) { e.preventDefault(); game.ui.pause(); } return; }
       if (game.paused || !game.ready) return;
       if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
       this.keys.add(e.code); if (e.repeat) return;

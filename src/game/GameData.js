@@ -65,6 +65,9 @@ export const ENEMY_TYPES = {
   stormElite: { name: '蚀星雷使', elite: true, ability: 'storm', trait: '雷罚 · 三重落雷', hp: 220, damage: 21, speed: 2.8, range: 12, windup: 1.25, cooldown: 3.8, xp: 135, scale: 1.3, color: '#b8a1ff' },
   boss: { name: '归墟之主 · 无相', hp: 1850, damage: 28, speed: 2.9, range: 4, windup: 1.15, cooldown: 2.8, xp: 420, scale: 2.5, color: '#b5c9e3' },
 };
+export function chapterAllows(seals, x, z) {
+  return (seals[0] || x <= -2) && (seals[1] || x <= 37 || z <= 4);
+}
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export function segmentDistance(x, z, ax, az, bx, bz) {

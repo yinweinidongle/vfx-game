@@ -18,7 +18,7 @@ const finite=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
 const int=(v,a,b)=>Math.max(a,Math.min(b,Math.floor(finite(v))));
 export function cleanGear(raw,kind){
   if(!raw||!/^g[1-9]\d{0,8}$/.test(raw.uid)||!Object.hasOwn(GEAR_SLOTS,raw.slot))return null;
-  return {uid:raw.uid,slot:raw.slot,rarity:int(raw.rarity,0,2),level:int(raw.level,1,50),enhance:int(raw.enhance,0,20),...(raw.slot==='weapon'?{weaponKind:weaponKind(raw,kind)}:{})};
+  return {uid:raw.uid,slot:raw.slot,rarity:int(raw.rarity,0,2),level:int(raw.level,1,50),enhance:int(raw.enhance,0,20),...(raw.locked===true?{locked:true}:{}),...(raw.slot==='weapon'?{weaponKind:weaponKind(raw,kind)}:{})};
 }
 export function readGearSave(raw,target){
   const inputs=Array.isArray(raw.gearBag)?raw.gearBag:[],equipped=raw.gearEquipped,ground=raw.groundGear;const ids=new Set();target.gearBag=[];

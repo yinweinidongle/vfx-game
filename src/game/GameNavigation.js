@@ -1,4 +1,4 @@
-import { isLand, segmentDistance } from './GameData.js';
+import { chapterAllows, isLand, segmentDistance } from './GameData.js';
 
 /** A* with reusable search arrays; routes respect land, obstacles and unlocked seals. */
 export class GameNavigation {
@@ -7,7 +7,7 @@ export class GameNavigation {
     const n=this.width*this.height;this.open=new Uint8Array(n);this.visited=new Uint32Array(n);this.closed=new Uint32Array(n);this.cost=new Float32Array(n);this.parent=new Int32Array(n);this.stamp=0;this.heap=[];
     for(let i=0;i<n;i++){const x=this.x0+(i%this.width)*this.cell,z=this.z0+Math.floor(i/this.width)*this.cell;this.open[i]=Number(isLand(x,z,.58)&&!state.obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.6));}
   }
-  allowed(i) { if(i<0||i>=this.open.length||!this.open[i])return false;const x=this.x0+i%this.width*this.cell,z=this.z0+Math.floor(i/this.width)*this.cell;return !(!this.state.save.seals[0]&&x>-2||!this.state.save.seals[1]&&x>37&&z>4); }
+  allowed(i) { if(i<0||i>=this.open.length||!this.open[i])return false;const x=this.x0+i%this.width*this.cell,z=this.z0+Math.floor(i/this.width)*this.cell;return chapterAllows(this.state.save.seals,x,z); }
   nearest(x,z) {
     const gx=Math.round((x-this.x0)/this.cell),gz=Math.round((z-this.z0)/this.cell);let best=-1,score=Infinity;
     for(let dz=-3;dz<=3;dz++)for(let dx=-3;dx<=3;dx++){const col=gx+dx,row=gz+dz;if(col<0||col>=this.width||row<0||row>=this.height)continue;const i=row*this.width+col,d=(this.x0+col*this.cell-x)**2+(this.z0+row*this.cell-z)**2;if(d<score&&this.allowed(i)){score=d;best=i;}}
@@ -20,7 +20,7 @@ export class GameNavigation {
     const steps=Math.max(1,Math.ceil(Math.hypot(tx-x,tz-z)/.35));
     for(let i=0;i<=steps;i++){
       const t=i/steps,px=x+(tx-x)*t,pz=z+(tz-z)*t;
-      if(!isLand(px,pz,.58)||!this.state.save.seals[0]&&px>-2||!this.state.save.seals[1]&&px>37&&pz>4)return false;
+      if(!isLand(px,pz,.58)||!chapterAllows(this.state.save.seals,px,pz))return false;
     }
     return true;
   }

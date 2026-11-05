@@ -1,5 +1,6 @@
+import {REGIONS, bountyProgress} from './RegionBounties.js';
 import { advanceLoot } from './LootMotion.js';
-import { BOONS, CLASSES, ENCOUNTERS, INTERACTABLES, ITEMS, SAVE_KEY, SKILLS, clamp, distance, heightAt, isLand, segmentDistance, zoneAt } from './GameData.js';
+import { BOONS, CLASSES, ENCOUNTERS, INTERACTABLES, ITEMS, SAVE_KEY, SKILLS, chapterAllows, clamp, distance, heightAt, isLand, segmentDistance, zoneAt } from './GameData.js';
 import { attackGrowth, projectileColor, MAX_FERVOR } from './AttackGrowth.js';
 import { GameFervorVolley } from './GameFervorVolley.js';
 import { GameHaloVolley } from './GameHaloVolley.js';
@@ -12,19 +13,26 @@ import { vitalityGrowth, spiritGrowth, skillColor } from './CultivationGrowth.js
 import { readGearSave, equippedGearStats } from './GearData.js';
 import { GameGear } from './GameGear.js';
 
-const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0, gearBag:[],gearEquipped:{},nextGearId:1,gearPity:0,shopEpoch:0,shopBought:[],groundGear:[],nextLootId:1 });
+const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0, trackedChapter: 0, gearBag:[],gearEquipped:{},nextGearId:1,gearPity:0,shopEpoch:0,shopBought:[],groundGear:[],nextLootId:1 });
 export function readSave(storage,key=SAVE_KEY) {
   try {
     const s = JSON.parse(storage.getItem(key));
-    if (s?.version !== 1 || !CLASSES[s.kind]) return null;
+    if (s?.version !== 1 || !Object.hasOwn(CLASSES, s.kind)) return null;
     const d = fresh(s.kind);
-    for (const key of ['level', 'xp', 'gold', 'playTime', 'kills', 'deaths', 'challenge']) d[key] = clamp(Number(s[key]) || 0, key === 'level' ? 1 : 0, key==='gold'?1000000000:100000);
-    d.pendingBoons=clamp(Math.floor(Number(s.pendingBoons)||0),0,50);
-    d.level = clamp(d.level, 1, 50); d.won = s.won === true;
+    const numeric = (value, min, max) => Number.isFinite(Number(value)) ? clamp(Number(value), min, max) : min;
+    d.level = Math.floor(numeric(s.level, 1, 50));
+    for (const key of ['xp', 'gold', 'kills', 'deaths', 'challenge']) d[key] = Math.floor(numeric(s[key], 0, key === 'gold' ? 1e9 : 1e7));
+    d.playTime = numeric(s.playTime, 0, Number.MAX_SAFE_INTEGER);
+    d.pendingBoons = Math.floor(numeric(s.pendingBoons, 0, 50));
+    d.trackedChapter = Math.floor(numeric(s.trackedChapter, 0, REGIONS.length));
+    if (Number.isInteger(s.rng) && s.rng >= 0 && s.rng <= 0xffffffff) d.rng = s.rng;
+    d.won = s.won === true;
     d.seals = [s.seals?.[0] === true, s.seals?.[1] === true];
-    d.cleared = (s.cleared || []).filter(id => ENCOUNTERS.some(e => e.id === id));
-    for (const k of ['opened', 'memories']) d[k] = (s[k] || []).filter(id => INTERACTABLES.some(e => e.id === id));
-    d.inventory = [...new Set((s.inventory || []).filter(id => ITEMS[id]))];
+    const ids = (list, valid) => [...new Set((Array.isArray(list) ? list : []).filter(id => typeof id === 'string' && valid(id)))];
+    d.cleared = ids(s.cleared, id => ENCOUNTERS.some(e => e.id === id));
+    d.opened = ids(s.opened, id => INTERACTABLES.some(e => e.id === id && e.type === 'chest'));
+    d.memories = ids(s.memories, id => INTERACTABLES.some(e => e.id === id && e.type === 'memory'));
+    d.inventory = ids(s.inventory, id => Object.hasOwn(ITEMS, id));
     for (const slot of ['charm', 'ring', 'arms']) if (d.inventory.includes(s.equipment?.[slot])&&ITEMS[s.equipment[slot]].slot===slot) d.equipment[slot] = s.equipment[slot];
     for (const b of BOONS) d.boons[b.id] = clamp(Math.floor(Number(s.boons?.[b.id]) || 0), 0, 50);
     if (INTERACTABLES.some(i => i.type === 'camp' && i.id === s.checkpoint)) d.checkpoint = s.checkpoint;
@@ -48,7 +56,8 @@ export class GameState {
     const camp = INTERACTABLES.find(i => i.id === this.save.checkpoint); this.player.x = camp.x; this.player.z = camp.z - 3;
     Object.assign(this.player,{shield:0,shieldDelay:0,regenLock:0,energyHitAt:-10,hurtFlash:0});
     this.recalculate(); this.player.hp = this.stats.hp; this.dead = false; this.boss = null; this.nearby = null;
-    this.saveDirty = false; this.rng = 19387; this.lastZone = zoneAt(this.player.x, this.player.z).id;
+    this.saveDirty = false; this.rng = this.save.rng ?? 19387; this.lastZone = zoneAt(this.player.x, this.player.z).id;
+    this.settleCappedBoons();
   }
   random() { this.rng = (Math.imul(1664525, this.rng) + 1013904223) >>> 0; return this.rng / 4294967296; }
   emit(type, detail = {}) { this.events.push({ ...detail, type }); }
@@ -64,14 +73,30 @@ export class GameState {
     if (previous && this.growth.tier > previous.tier) this.emit('ascend', { ...this.growth, x: this.player.x, z: this.player.z, text: `攻势觉醒 · ${this.growth.name} · ${this.growth.shots} 重追击` });
     if(previous&&this.growth.stacks>previous.stacks)this.emit('fervorUpgrade',{from:previous.stacks,stacks:this.growth.stacks,finishTier:this.growth.finishTier,text:`锋芒 ${this.growth.stacks} 层 · 新增一枚${this.growth.spiritName} · ${this.growth.echoes} 道追击${this.growth.finishTier>previous.finishTier?' · 终结爆发进阶':''}`});
   }
+  attackBase() { return CLASSES[this.kind].damage + equippedGearStats(this.save).damage; }
   statsFor(equipment=this.save.equipment,gearEquipped=this.save.gearEquipped) {
     const c = CLASSES[this.kind], b = this.save.boons, items = Object.values(equipment).map(id => ITEMS[id]).filter(Boolean);
     const sum = k => items.reduce((n, i) => n + (i[k] || 0), 0);
     const spirit=spiritGrowth(b.spirit),gear=equippedGearStats(this.save,gearEquipped);
     return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality')+gear.hp, damage: (c.damage+gear.damage) * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier+gear.regen, energyMax:spirit.energyMax+gear.energyMax, speed: c.speed*(1+Math.min(.65,gear.speed)),attackSpeed:1+Math.min(1.4,gear.attackSpeed) };
   }
-  write(storage) { try { this.gear.syncGround(false);storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
+  write(storage) { try { this.gear.syncGround(false);this.save.rng=this.rng;storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
+  trackBounty(chapter) {
+    const region = REGIONS[chapter - 1];
+    const progress = region && bountyProgress(this.save, region);
+    if (!progress?.available || !progress.next) return false;
+    this.save.trackedChapter = this.save.trackedChapter === chapter ? 0 : chapter;
+    this.saveDirty = true;
+    return true;
+  }
   objective() {
+    const region = REGIONS[this.save.trackedChapter - 1];
+    if (region) {
+      const next = region.encounters.find(e => !this.save.cleared.includes(e.id));
+      if (next && this.encounters.accessible(next)) {
+        return {title: region.name + ' · 清剿悬赏', text: '前往' + next.name + '，击退全部敌人', x: next.x, z: next.z};
+      }
+    }
     if (this.save.won) { const camp=INTERACTABLES.filter(i=>i.type==='camp').sort((a,b)=>distance(a,this.player)-distance(b,this.player))[0];return { title:'归墟已醒',text:'回到任意灯台，开启更高难度的轮回。',x:camp.x,z:camp.z }; }
     if (!this.save.seals[0]) return { title: '第一章 · 风雪旧梦', text: this.save.cleared.includes('frostkeeper') ? '激活听雪封印' : '击败北方的封印守望者', x: -24, z: -16 };
     if (!this.save.seals[1]) return { title: '第二章 · 悬星遗梦', text: this.save.cleared.includes('starkeeper') ? '激活悬星封印' : '穿过石桥，解除遗迹深处的封印', x: 16, z: -28 };
@@ -80,12 +105,12 @@ export class GameState {
   move(entity, dx, dz, radius = .45) {
     let x = entity.x + dx, z = entity.z + dz;
     if (!isLand(x, z, radius)) return;
-    if (entity === this.player && ((!this.save.seals[0] && x > -2) || (!this.save.seals[1] && x > 37 && z > 4))) return;
+    if (entity === this.player && !chapterAllows(this.save.seals,x,z)) return;
     for (const o of this.obstacles) {
       const ox = x - o.x, oz = z - o.z, d = Math.hypot(ox, oz), min = radius + o.r;
       if (d < min && d > .0001) { x = o.x + ox / d * min; z = o.z + oz / d * min; }
     }
-    if (isLand(x, z, radius)) { entity.x = x; entity.z = z; }
+    if (isLand(x,z,radius) && (entity !== this.player || chapterAllows(this.save.seals,x,z))) { entity.x=x; entity.z=z; }
   }
   spawn(encounter) {
     this.encounters.start(encounter);
@@ -102,17 +127,20 @@ export class GameState {
     const p=this.player,g=this.growth,count=g.shots,socket=this.kind==='ice'&&(kind==='arrow'||kind==='frost')?this.attackSocket:null;
     const magic=!primary?this.spirit:null,index=kind==='frost'?0:1;
     const targets=this.enemies.filter(e=>e.hp>0&&e.state!=='return'&&distance(e,p)<24).sort((a,b)=>distance(a,target||p)-distance(b,target||p));
+    let launched = 0;
     for(let i=0;i<count;i++){
-      const enemy=targets[i%Math.max(1,targets.length)]||target,angle=enemy?Math.atan2(enemy.x-p.x,enemy.z-p.z):yaw;
+      const enemy=(i===0 && target) || targets[i%Math.max(1,targets.length)]||target,angle=enemy?Math.atan2(enemy.x-p.x,enemy.z-p.z):yaw;
       const lane=i-(count-1)/2,sign=count===1?(p.combo%2?1:-1):Math.sign(lane)||1;
       const arc=(kind==='arrow'||kind==='frost'||kind==='spirit')?sign*(.34+Math.abs(lane)*.16):lane*.1;
       const near=enemy?Math.min(1,distance(enemy,p)/5):1;
       // The primary projectile keeps its full damage after a form unlock; echoes add damage.
-      this.launch(kind,'player',(socket?.x??p.x)+Math.cos(angle)*lane*.16,(socket?.z??p.z)-Math.sin(angle)*lane*.16,angle+arc*near,damage*(i===0?1:.42),
+      const shot = this.launch(kind,'player',(socket?.x??p.x)+Math.cos(angle)*lane*.16,(socket?.z??p.z)-Math.sin(angle)*lane*.16,angle+arc*near,damage*(i===0?1:.42),
         {y:socket?.y??heightAt(p.x,p.z)+1.2,target:enemy,arc,delay:.12,tier:g.tier,radiance:g.radiance,color:magic?.level?skillColor(index,magic.level):projectileColor(kind,g.tier),spiritLevel:magic?.level||0,skillStage:magic?.stage||0,skillAccent:magic?.accent,
           radius:kind==='slash'?(primary?.72:1.9):.48,scale:(kind==='slash'?(primary?.62:1.12):kind==='frost'?1.25:.85)*(i?.85:1)*(magic?.size||1),
           life:2,homing:true,pierce:kind==='slash'&&!primary,primary,echo:i>0});
+      if (shot) launched++;
     }
+    return launched;
   }
   attack(aimX, aimZ) {
     const p = this.player; if (this.dead || p.attackCooldown > 0 || p.dash > 0 || (this.awakening.active&&this.awakening.age<.5)) return false;
@@ -139,17 +167,27 @@ export class GameState {
     if(!target){this.emit('toast',{text:'附近暂无可攻击的敌人，技能与灵力已保留。'});return false;}
     this.lockedTarget=target;aimX=target.x;aimZ=target.z;
     if (p.energy < skill.cost) { this.emit('toast', { text: '灵力不足，普通攻击与时间流逝可以恢复灵力。' }); return false; }
+    const yaw = Math.atan2(aimX - p.x, aimZ - p.z);
+    const area = index === 2 ? this.zones.find(z => !z.alive) : null;
+    let hasEffect = true;
+    if (index < 2) {
+      const damage = this.stats.damage * (index === 0 ? 2.3 : 3.3) * this.spirit.damage;
+      hasEffect = this.volley(skill.id, target, yaw, damage) > 0;
+    } else if (index === 2) {
+      hasEffect = !!area;
+    }
+    if (!hasEffect) {
+      this.emit('toast', {text: '当前攻势密集，请稍后再释放。'});
+      return false;
+    }
     p.energy -= skill.cost;p.regenLock=1.4; p.cooldowns[index] = skill.cooldown * (1 - this.stats.haste);
     p.yaw = Math.atan2(aimX - p.x, aimZ - p.z); p.action = index >= 2 ? 'cast' : 'attack'; p.actionTime = 0;
     if(index>=3){p.invulnerable=Math.max(p.invulnerable,.65);p.attackCooldown=Math.max(p.attackCooldown,.5);this.awakening.begin(index);}
-    else if (index < 2) {
-      this.volley(skill.id,target,p.yaw,this.stats.damage*(index===0?2.3:3.3)*this.spirit.damage);
-    } else {
+    else if (index === 2) {
       const d = Math.hypot(aimX - p.x, aimZ - p.z), limit = Math.min(d, 26) / Math.max(d, .001);
       const x = p.x + (aimX - p.x) * limit, z = p.z + (aimZ - p.z) * limit;
-      const area = this.zones.find(z => !z.alive);
       const color=this.spirit.level?skillColor(2,this.spirit.level):this.growth.color;
-      if (area) Object.assign(area, { alive: true, owner: 'player', x, z, radius: 5*this.spirit.size, age: 0, delay: .85, life: 3.8, tick: .85, damage: this.stats.damage * 1.4*this.spirit.damage, tier:this.growth.tier, color, radiance:this.growth.radiance,spiritLevel:this.spirit.level,skillStage:this.spirit.stage,skillAccent:this.spirit.accent });
+      Object.assign(area, { alive: true, owner: 'player', x, z, radius: 5*this.spirit.size, age: 0, delay: .85, life: 3.8, tick: .85, damage: this.stats.damage * 1.4*this.spirit.damage, tier:this.growth.tier, color, radiance:this.growth.radiance,spiritLevel:this.spirit.level,skillStage:this.spirit.stage,skillAccent:this.spirit.accent });
       const event={x:p.x,z:p.z,targetX:x,targetZ:z,yaw:p.yaw,tier:this.growth.tier,color,spiritLevel:this.spirit.level,skillStage:this.spirit.stage,skillAccent:this.spirit.accent};
       this.haloVolley.begin(event,this.growth.haloCount+this.spirit.haloBonus,this.stats.damage*(.12+this.growth.tier*.015)*this.spirit.damage);
       this.emit('divine',event);
@@ -196,13 +234,23 @@ export class GameState {
   }
   gainXP(xp) {
     this.save.xp += xp;
-    while (this.save.level < 50 && this.save.xp >= this.save.level * 95) { this.save.xp -= this.save.level * 95; this.save.level++; this.pendingBoons++; this.save.pendingBoons=this.pendingBoons; this.saveDirty=true; this.recalculate(); this.player.hp = this.stats.hp; this.emit('level');const unlocked=SKILLS.find(k=>k.unlockLevel===this.save.level);if(unlocked)this.emit('awakeningUnlocked',{text:`觉醒已至 · ${unlocked.key} · ${unlocked.name} 已解锁。`}); }
+    while (this.save.level < 50 && this.save.xp >= this.save.level * 95) { this.save.xp -= this.save.level * 95; this.save.level++; this.pendingBoons++; this.save.pendingBoons=this.pendingBoons; this.saveDirty=true; this.recalculate(); if (!this.dead) this.player.hp = this.stats.hp; this.emit('level');const unlocked=SKILLS.find(k=>k.unlockLevel===this.save.level);if(unlocked)this.emit('awakeningUnlocked',{text:`觉醒已至 · ${unlocked.key} · ${unlocked.name} 已解锁。`}); }
+    this.settleCappedBoons();
     if (this.save.level === 50) this.save.xp = Math.min(this.save.xp, 50 * 95);
+  }
+  settleCappedBoons() {
+    if (!this.pendingBoons || BOONS.some(b => this.save.boons[b.id] < MAX_FERVOR)) return;
+    const gold = this.pendingBoons * 120;
+    this.pendingBoons = this.save.pendingBoons = 0;
+    this.save.gold += gold;
+    this.saveDirty = true;
+    this.emit('toast', {text: `三道圆满，本次修行奖励折合 ${gold} 灵石。`});
   }
   chooseBoon(id) {
     if (this.pendingBoons <= 0 || !BOONS.some(b => b.id === id) || this.save.boons[id]>=MAX_FERVOR) return;
     this.save.boons[id]++; this.pendingBoons--; this.save.pendingBoons=this.pendingBoons; this.recalculate(); this.player.hp = this.stats.hp; this.saveDirty = true;
     if(id==='vitality'){this.player.shield=this.vitality.capacity;this.player.shieldDelay=0;}
+    this.settleCappedBoons();
   }
   grantItem(id) {
     if (!this.save.inventory.includes(id)) this.save.inventory.push(id);
@@ -234,6 +282,17 @@ export class GameState {
     const cost = 100 + this.save.boons.power * 65;
     if (this.save.gold < cost || this.save.boons.power>=MAX_FERVOR) return false;
     this.save.gold -= cost; this.save.boons.power++; this.recalculate(); this.saveDirty = true; return true;
+  }
+  nextCycle() {
+    if (!this.save.won || !this.gear.canTrade()) return null;
+    const progress = structuredClone(this.save);
+    Object.assign(progress, {challenge: progress.challenge + 1, won: false, seals: [false, false],
+      cleared: [], opened: [], trackedChapter: 0, checkpoint: 'camp', groundGear: [], rng: this.rng});
+    const next = new GameState(this.kind, progress);
+    for (const drop of this.drops) {
+      if (drop.alive && drop.gear) next.gear.grant(drop.gear, false);
+    }
+    return next;
   }
   revive() {
     const camp = INTERACTABLES.find(o => o.id === this.save.checkpoint); const p = this.player;

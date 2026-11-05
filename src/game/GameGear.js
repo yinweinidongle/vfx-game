@@ -8,10 +8,25 @@ export class GameGear{
   constructor(state){this.state=state;this.revision=0;}
   find(uid){return this.state.save.gearBag.find(g=>g.uid===uid);}
   canTrade(){const s=this.state;return !s.dead&&INTERACTABLES.some(o=>o.type==='camp'&&distance(o,s.player)<5)&&!s.enemies.some(e=>e.hp>0&&e.state!=='return'&&distance(e,s.player)<10);}
-  changed(){this.revision++;this.state.recalculate();this.state.saveDirty=true;}
+  changed(){this.revision++;this.state.recalculate();this.state.settleCappedBoons();this.state.saveDirty=true;}
   grant(spec,notify=true){
-    const s=this.state;if(!Object.hasOwn(GEAR_SLOTS,spec.slot)||!Number.isInteger(spec.rarity)||spec.rarity<0||spec.rarity>2)return null;
-    if(s.save.gearBag.length>=GEAR_CAPACITY){const value=gearSellValue({...spec,enhance:spec.enhance||0});s.save.gold+=value;s.saveDirty=true;s.emit('toast',{text:`行囊已满，新装备自动回收为 ${value} 灵石。`});return null;}
+    const s=this.state;
+    if (!Object.hasOwn(GEAR_SLOTS,spec.slot) || !Number.isInteger(spec.rarity) || spec.rarity<0 || spec.rarity>2) return null;
+    if (s.save.gearBag.length >= GEAR_CAPACITY) {
+      const protectedIds = new Set(Object.values(s.save.gearEquipped));
+      let replace;
+      for (const item of s.save.gearBag) {
+        if (protectedIds.has(item.uid) || item.locked || item.enhance || item.rarity >= spec.rarity) continue;
+        if (!replace || item.rarity < replace.rarity || (item.rarity === replace.rarity && gearSellValue(item) < gearSellValue(replace))) replace = item;
+      }
+      if (!replace) {
+        const value = gearSellValue({...spec, enhance: spec.enhance || 0});
+        s.save.gold += value; s.saveDirty = true;
+        s.emit('toast', {text: `行囊已满，新装备已回收为 ${value} 灵石。`});
+        return null;
+      }
+      this.sell(replace.uid);
+    }
     const item={uid:'g'+s.save.nextGearId++,slot:spec.slot,rarity:spec.rarity,level:Math.max(1,Math.min(50,Math.floor(spec.level||s.save.level))),enhance:Math.max(0,Math.min(20,Math.floor(spec.enhance||0)))};
     if(item.slot==='weapon')item.weaponKind=weaponKind(spec,s.kind);
     s.save.gearBag.push(item);s.saveDirty=true;this.revision++;if(notify)s.emit('gearLoot',{item});return item;
@@ -26,7 +41,16 @@ export class GameGear{
   syncGround(dirty=true){const s=this.state;s.save.groundGear=s.drops.filter(d=>d.alive&&d.gear).slice(0,96).map(d=>({lootId:d.lootId,x:d.x,z:d.z,age:d.age,birthX:d.birthX,birthZ:d.birthZ,landX:d.landX,landZ:d.landZ,flight:d.flight,arc:d.arc,landed:d.landed,seed:d.seed,gear:{...d.gear}}));if(dirty)s.saveDirty=true;}
   equip(uid){const item=this.find(uid);if(!item||this.state.dead)return false;this.state.save.gearEquipped[item.slot]=uid;this.changed();this.state.emit('gearEquipped',{item});return true;}
   unequip(slot){if(!Object.hasOwn(GEAR_SLOTS,slot)||!this.state.save.gearEquipped[slot])return false;delete this.state.save.gearEquipped[slot];this.changed();return true;}
-  sell(uid){const item=this.find(uid),s=this.state;if(!item||Object.values(s.save.gearEquipped).includes(uid))return false;s.save.gold+=gearSellValue(item);s.save.gearBag.splice(s.save.gearBag.indexOf(item),1);s.saveDirty=true;this.revision++;s.emit('toast',{text:`已回收 ${gearName(item)}，获得 ${gearSellValue(item)} 灵石。`});return true;}
+  toggleLock(uid) {
+    const item = this.find(uid);
+    if (!item || this.state.dead) return false;
+    if (item.locked) delete item.locked;
+    else item.locked = true;
+    this.revision++;
+    this.state.saveDirty = true;
+    return true;
+  }
+  sell(uid){const item=this.find(uid),s=this.state;if(!item||item.locked||Object.values(s.save.gearEquipped).includes(uid))return false;s.save.gold+=gearSellValue(item);s.save.gearBag.splice(s.save.gearBag.indexOf(item),1);s.saveDirty=true;this.revision++;s.emit('toast',{text:`已回收 ${gearName(item)}，获得 ${gearSellValue(item)} 灵石。`});return true;}
   enhance(uid){
     const item=this.find(uid),s=this.state;if(!item||!this.canTrade())return {ok:false,reason:'请在安全的灯台附近强化。'};
     const info=enhancementInfo(item);if(info.max)return {ok:false,reason:'已达到 +20 强化上限。'};if(s.save.gold<info.cost)return {ok:false,reason:'灵石不足。'};

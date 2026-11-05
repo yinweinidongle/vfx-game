@@ -30,5 +30,5 @@ export class GameLootVFX{
   this.beams.count=beams;this.beams.instanceMatrix.needsUpdate=beams>0;this.beams.geometry.attributes.aTint.needsUpdate=beams>0;
   this.flare.update(dt);
  }
- dispose(){this.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});this.group.removeFromParent();}
+ dispose(){this.group.traverse(o=>{if(o.isMesh){if(o.isInstancedMesh)o.dispose();o.geometry.dispose();o.material.dispose();}});this.group.removeFromParent();}
 }

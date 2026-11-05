@@ -1,3 +1,4 @@
+import {JourneyStorage} from './JourneyStorage.js';
 import { warmVFX } from './VFXWarmup.js';
 import './gear-ui.css';
 import * as T from 'three';
@@ -19,10 +20,13 @@ import { GameRouteGuide } from './GameRouteGuide.js';
 import { GameSkillCamera } from './GameSkillCamera.js';
 import { GameUI } from './GameUI.js';
 import { AwakeningPresentation } from './AwakeningPresentation.js';
-import { SETTINGS_KEY, heightAt } from './GameData.js';
+import { SAVE_KEY, SETTINGS_KEY, heightAt } from './GameData.js';
 
 export class RPGGame {
-  constructor(kind, save, settings) {
+  constructor(kind, save, settings, storage) {
+    try { this.storage = storage === undefined ? new JourneyStorage(localStorage) : storage; }
+    catch { this.storage = null; }
+    this.saveAgainAfter = 0;
     this.state = new GameState(kind,save); this.settings=settings; this.container=document.querySelector('#game-world');
     this.scene=new T.Scene();this.scene.background=new T.Color('#8ca9af');this.scene.fog=new T.FogExp2('#8ca9af',.013);
     this.camera=new T.PerspectiveCamera(44,1,.12,260);this.cameraYaw=.65;this.zoom=20;this.cameraTarget=new T.Vector3();this.cameraEye=new T.Vector3();this.cameraSnap=true;this.skillCamera=new GameSkillCamera(this);
@@ -40,6 +44,14 @@ export class RPGGame {
     this.targetRing=new T.Mesh(new T.RingGeometry(.22,.27,40),new T.MeshBasicMaterial({color:'#c6f6ed',transparent:true,opacity:.65,depthWrite:false}));this.targetRing.rotation.x=-Math.PI/2;this.scene.add(this.targetRing);
     this.ready=false;this.paused=true;this.accumulator=0;this.saveClock=0;this.shake=0;this.hitStop=0;this.fps=60;this.frames=0;this.frameTime=0;this.lowFrames=0;this.dpr=1;
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(this.container);this.configure(settings);
+    this.onStorageChange = event => {
+      if (!this.ready || !this.storage || event.storageArea !== localStorage || (event.key !== SAVE_KEY && event.key !== null)) return;
+      if (this.storage.getItem(SAVE_KEY) !== this.storage.lastSave) {
+        this.storage.conflict = true;
+        this.saveProblem();
+      }
+    };
+    window.addEventListener('storage', this.onStorageChange);
     this.onVisibility=()=>{this.input.clear();if(document.hidden&&this.ready&&!this.paused){this.ui.pause();this.audio.pause();}this.lastTime=performance.now();};document.addEventListener('visibilitychange',this.onVisibility);
     this.renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.paused=true;document.querySelector('#game-loading').hidden=false;document.querySelector('#game-loading-text').textContent='图形上下文中断。进度已保存，请刷新页面继续。';this.save();});
     this.lastTime=performance.now();this.tick=this.tick.bind(this);this.raf=requestAnimationFrame(this.tick);
@@ -53,7 +65,8 @@ export class RPGGame {
     progress('编织技能与光影…');this.fx=new GameFX(this.scene,this.camera,this.state,this.actors);await this.fx.ready;
     this.ui=new GameUI(this);this.awakeningView=new AwakeningPresentation(this);await Promise.all([this.awakeningView.ready,this.audio.loadAwakening(this.state.kind),this.audio.loot.load(`${import.meta.env.BASE_URL}game/audio/loot/treasure-chimes-v1.wav`)]);this.cameraSnap=true;this.updateCamera(0);this.world.update(0,0);this.actors.update(0);this.fx.update(0);
     progress('准备战斗演出…');await warmVFX(this.renderer,this.scene,this.camera,[this.fx.group,this.fx.thunder.group,this.fx.ascendant.group,this.fx.loot.group,this.actors.warmActor.group]);this.ready=true;this.paused=false;this.lastTime=performance.now();document.querySelector('#game-loading').hidden=true;
-    document.querySelector('#game-hud').hidden=false;this.save();
+    document.querySelector('#game-hud').hidden=false;
+    if (this.save() === false && this.storage) { this.saveProblem(); return this; }
     if(this.state.pendingBoons)this.ui.boon();else if(this.state.save.playTime<1)this.ui.tutorial();
     return this;
   }
@@ -95,6 +108,7 @@ export class RPGGame {
   handleEvents() {
     const events=this.state.events.splice(0);
     this.audio.loot.handle(events,this.state.player,this.camera);
+    if (events.some(e => e.type === 'gearDrop')) this.ui.lootRevealTime = .25;
     for(const e of events){
       if(e.type==='spawn')this.actors.spawn(e.enemy);
       if(e.type==='attack'||e.type==='cast')this.actors.attack(e.index>=2);
@@ -122,15 +136,39 @@ export class RPGGame {
       if(this.input.attacking)this.state.attack(this.aim.x,this.aim.z);
       let steps=0;while(this.accumulator>=1/60&&steps<4){if(this.hitStop<=0)this.state.update(1/60,this.input);this.accumulator-=1/60;steps++;}
       this.handleEvents();this.awakeningView.update(dt);this.updateCamera(dt);this.actors.update(this.hitStop>0?0:simDt);this.world.update(this.state.time,simDt);if(this.skillCamera.weight>0)this.world.hero.value.lerp(this.cameraTarget,this.skillCamera.weight);this.fx.update(this.hitStop>0?0:simDt);this.guide.update(this.state.time);
-      this.saveClock+=dt;if(this.saveClock>5||this.state.saveDirty){this.save();this.saveClock=0;}
+      this.saveClock+=dt;if((this.saveClock>5||this.state.saveDirty) && now>=this.saveAgainAfter){this.save();this.saveClock=0;}
     }else if(!this.ready)this.updateCamera(dt);
     if(this.ready&&(!this.paused||this.needsRender)){this.renderer.info.reset();this.composer.render();this.needsRender=false;this.frames++;this.frameTime+=rawDt;}
     if(this.frameTime>1){this.fps=this.frames/this.frameTime;this.frames=0;this.frameTime=0;if(this.settings.quality==='auto'&&this.ready&&!this.paused){if(this.fps<48)this.lowFrames++;else this.lowFrames=0;if(this.lowFrames>=3&&this.dpr>.75){this.dpr=Math.max(.75,this.dpr-.15);this.resize();this.lowFrames=0;}}}
     if(this.ready&&!this.paused)this.ui.update(dt,this.fps,this.renderer.info.render.calls);this.audio.update();
   }
-  save() { this.state.write(localStorage); }
-  challenge() {
-    const s=this.state.save;s.challenge++;s.won=false;s.seals=[false,false];s.cleared=[];s.opened=[];s.checkpoint='camp';this.save();window.location.href='game.html?continue=1';
+  save() {
+    if (!this.ready || this.saveBlocked || this.storage?.conflict) return false;
+    const ok = this.state.write(this.storage);
+    if (!ok) {
+      this.saveAgainAfter = performance.now() + 10000;
+      if (this.storage?.conflict && !this.paused) this.saveProblem();
+    }
+    return ok;
   }
-  dispose() { this.save();cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.awakeningView?.dispose();this.ui?.lootLabels?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
+  saveProblem() {
+    if (this.saveBlocked) return;
+    this.saveBlocked = true;
+    const changed = this.storage?.conflict;
+    this.ui.open(`<h1>${changed ? '另一页已更新旅途' : '存档暂时无法写入'}</h1><p>${changed ? '请返回标题读取最新进度。' : '请检查浏览器的存储空间与站点存储权限，再返回标题重试。'}</p><div class="dialog-buttons"><a class="primary" href="game.html">返回标题</a></div>`);
+    this.ui.dialog.querySelector('.dialog-close').hidden = true;
+  }
+  challenge() {
+    const previous = this.state;
+    const next = previous.nextCycle();
+    if (!next) return;
+    this.state = next;
+    if (this.save() === false) {
+      this.state = previous;
+      this.saveProblem();
+      return;
+    }
+    window.location.href = 'game.html?continue=1';
+  }
+  dispose() { if(this.ready)this.save();window.removeEventListener('storage',this.onStorageChange);cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.awakeningView?.dispose();this.ui?.lootLabels?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
 }

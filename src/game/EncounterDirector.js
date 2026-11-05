@@ -1,3 +1,4 @@
+import {REGIONS, bountyProgress} from './RegionBounties.js';
 import { ENCOUNTERS, ENEMY_TYPES, distance, isLand, zoneAt, clamp } from './GameData.js';
 
 export const MAX_ACTIVE_ENEMIES = 18;
@@ -95,9 +96,20 @@ export class EncounterDirector {
       if (battle.wave < battle.waves.length - 1) { battle.nextIn = 1.5; s.emit('toast', { text: '灵潮未息 · 援军即将抵达' }); return; }
     }
     battle.done = true;
-    if (!s.save.cleared.includes(encounter.id)) s.save.cleared.push(encounter.id);
+    const firstClear = !s.save.cleared.includes(encounter.id);
+    if (firstClear) s.save.cleared.push(encounter.id);
     const reward = 20 + encounter.level * 6; s.save.gold += reward;
     s.emit('clear', { text: encounter.boss ? '归墟之主已被击败' : `此处已净化 · 灵石 +${reward}` });
+    if (firstClear) {
+      const region = REGIONS[encounter.chapter - 1];
+      const bounty = bountyProgress(s.save, region);
+      if (!bounty.next) {
+        s.gainXP(bounty.xp);
+        s.save.gold += bounty.gold;
+        if (s.save.trackedChapter === region.chapter) s.save.trackedChapter = 0;
+        s.emit('toast', {text: `${region.name}清剿完成 · 历练 +${bounty.xp} · 灵石 +${bounty.gold}`});
+      }
+    }
     if (encounter.boss) { s.save.won = true; s.grantItem('sigil'); s.emit('victory'); }
     s.saveDirty = true;
   }

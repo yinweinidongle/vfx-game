@@ -1,3 +1,4 @@
+import {REGIONS, bountyProgress} from './RegionBounties.js';
 import { GameLootLabels } from './GameLootLabels.js';
 import * as T from 'three';
 import { BOONS, CLASSES, INTERACTABLES, ITEMS, SKILLS, ZONES, zoneAt, heightAt } from './GameData.js';
@@ -35,7 +36,7 @@ export class GameUI {
     document.querySelector('#inventory-button').onclick = () => this.inventory(); document.querySelector('#pause-button').onclick = () => this.pause(); document.querySelector('#map-open').onclick = () => this.map();
     this.mapCanvas = document.querySelector('#minimap'); this.mapContext = this.mapCanvas.getContext('2d');this.atlas=new GameMap(game);
     for (const n of this.numbers) { n.element.className = 'damage-number'; n.element.hidden = true; document.querySelector('#damage-layer').append(n.element); }
-    this.enemyLabels = new Map(); this.dialog = document.querySelector('#game-dialog'); this.dialog.addEventListener('cancel', e => { e.preventDefault(); if (!this.state.dead && (!this.state.pendingBoons||this.state.awakening.active)) this.close(); });
+    this.enemyLabels = new Map(); this.dialog = document.querySelector('#game-dialog'); this.dialog.addEventListener('cancel', e => { e.preventDefault(); if (!this.state.dead && !this.dialog.querySelector('[data-boon]')) this.close(); });
     this.labelRects = new Float32Array(32 * 4);
     // An attack held through a level-up must not select the card under its release.
     this.awaitingRelease=false;this.ignoreClicksUntil=0;
@@ -52,12 +53,18 @@ export class GameUI {
     this.dialog.querySelector('.dialog-close').onclick = () => this.close(); if (!this.dialog.open) this.dialog.showModal();
   }
   close() {
-    if (this.state.dead || (this.state.pendingBoons > 0&&!this.state.awakening.active)) return;
+    if (this.state.dead || this.game.storage?.conflict || this.game.saveBlocked) return;
+    if (!this.state.awakening.active) {
+      if (this.deferredVictory) { this.deferredVictory=false; this.victory(); return; }
+      if (this.state.pendingBoons > 0) { this.boon(); return; }
+    }
     this.dialog.close(); this.game.paused = false; this.game.audio.resume(); this.game.input.clear();
   }
   pause() {
-    this.open(`<span class="kicker">FROSTBOUND / JOURNEY PAUSED</span><h1>片刻，亦是修行。</h1><p>旅途已经记录在此设备。继续时从最近的灯台出发。</p><div class="dialog-buttons"><button class="primary" id="resume-game">继续旅程 <span>→</span></button><button id="settings-game">声音与画质</button><button id="controls-game">操作指南</button><a href="game.html">返回标题</a><a href="index.html">返回技能实验室</a></div>`);
-    this.game.save(); this.dialog.querySelector('#resume-game').onclick = () => this.close(); this.dialog.querySelector('#settings-game').onclick = () => this.settings(); this.dialog.querySelector('#controls-game').onclick = () => this.tutorial();
+    const saved = this.game.save();
+    if (this.game.saveBlocked) return;
+    this.open(`<span class="kicker">FROSTBOUND / JOURNEY PAUSED</span><h1>片刻，亦是修行。</h1><p>${saved ? '旅途已经记录在此设备。重新进入时从最近的灯台出发。' : '进度尚未写入，请检查浏览器的站点存储权限和可用空间。'}</p><div class="dialog-buttons"><button class="primary" id="resume-game">继续旅程 <span>→</span></button><button id="settings-game">声音与画质</button><button id="controls-game">操作指南</button><a href="game.html">返回标题</a><a href="index.html">返回技能实验室</a></div>`);
+    this.dialog.querySelector('#resume-game').onclick = () => this.close(); this.dialog.querySelector('#settings-game').onclick = () => this.settings(); this.dialog.querySelector('#controls-game').onclick = () => this.tutorial();
   }
   settings() {
     const s = this.game.settings;
@@ -66,7 +73,7 @@ export class GameUI {
     this.dialog.querySelector('#volume-setting').oninput = e => this.game.configure({ volume: Number(e.target.value) }); this.dialog.querySelector('#shake-setting').onchange = e => this.game.configure({ shake: e.target.checked }); this.dialog.querySelector('#camera-setting').onchange=e=>this.game.configure({skillCamera:e.target.checked});this.dialog.querySelector('#route-setting').onchange=e=>this.game.configure({route:e.target.checked});this.dialog.querySelector('#music-setting').onchange=e=>this.game.configure({musicMuted:!e.target.checked});this.dialog.querySelector('#settings-done').onclick = () => this.close();
   }
   tutorial() {
-    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、提升三道修行。地图查看目标。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
+    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、提升三道修行。M 查看地图，可追踪区域清剿悬赏。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
     this.dialog.querySelector('#tutorial-done').onclick = () => this.close();
   }
   inventory(){this.gearUI.inventory();}
@@ -83,8 +90,21 @@ export class GameUI {
     this.dialog.querySelectorAll('[data-item]').forEach(b => b.onclick = () => { this.state.equip(b.dataset.item); this.game.save(); this.inventory(); });
   }
   map() {
-    this.open(`<span class="kicker">ATLAS / 归墟群岛</span><h1>星途所向</h1><canvas id="large-map" width="1440" height="920" aria-label="世界地图"></canvas><div class="map-legend"><span>◈ 当前位置</span><span>◇ 当前目标</span><span>✦ 灯台</span><span>□ 宝箱</span></div>`,'wide-dialog');
+    const save = this.state.save;
+    const regions = REGIONS.map(region => {
+      const b = bountyProgress(save, region), tracked = save.trackedChapter === region.chapter;
+      const status = !b.next ? '已完成' : !b.available ? '待解封' : tracked ? '返回主线' : '追踪';
+      return `<article><div><strong>${region.name}</strong><small>${b.cleared} / ${b.total} 处净化</small></div><p>历练 +${b.xp} · 灵石 +${b.gold}</p><button data-bounty="${region.chapter}" aria-pressed="${tracked}" ${b.available && b.next ? '' : 'disabled'}>${status}</button></article>`;
+    }).join('');
+    this.open(`<span class="kicker">ATLAS / 归墟群岛</span><h1>星途所向</h1><div class="atlas-content"><div><canvas id="large-map" width="1440" height="920" aria-label="世界地图"></canvas><div class="map-legend"><span>◈ 当前位置</span><span>◇ 当前目标</span><span>✦ 灯台</span><span>□ 宝箱</span></div></div><section class="region-bounties"><h2>区域清剿</h2><p>净化区域内全部据点，自动领取本轮悬赏。</p><div>${regions}</div></section></div>`, 'wide-dialog atlas-dialog');
     this.drawMap(this.dialog.querySelector('canvas'));
+    for (const button of this.dialog.querySelectorAll('[data-bounty]')) button.onclick = () => {
+      if (this.state.trackBounty(Number(button.dataset.bounty))) {
+        this.game.guide.update(this.state.time);
+        this.game.save();
+        this.map();
+      }
+    };
   }
   toggleRoute() { this.game.configure({route:this.game.settings.route===false});this.toast(this.game.settings.route?'引路已开启 · 沿金色光带前进':'引路已收起'); }
   growthInfo() {
@@ -105,11 +125,11 @@ export class GameUI {
   fervorPreview() {
     const g=this.state.growth,n=g.stacks,next=n+1;
     if(n>=MAX_FERVOR)return '<div class="fervor-preview"><b>锋芒圆满 · 50 层</b><span>五十灵锋列阵已成</span></div>';
-    return `<div class="fervor-preview"><b>锋芒 ${n} → ${next} 层</b><span>${g.spiritName}列阵 <strong>${n} → ${next} 枚</strong></span><span>每轮追击 <strong>${n} → ${next} 道</strong></span><span>攻击 <strong>${this.state.stats.damage.toFixed(1)} → ${(this.state.stats.damage+CLASSES[this.state.kind].damage*.12).toFixed(1)}</strong></span><small>剑气 · ${swordEvolution(next).name}，色阶与流纹增强${next%5===0?' · 终结爆发进阶':''}</small></div>`;
+    return `<div class="fervor-preview"><b>锋芒 ${n} → ${next} 层</b><span>${g.spiritName}列阵 <strong>${n} → ${next} 枚</strong></span><span>每轮追击 <strong>${n} → ${next} 道</strong></span><span>攻击 <strong>${this.state.stats.damage.toFixed(1)} → ${(this.state.stats.damage+this.state.attackBase()*.12).toFixed(1)}</strong></span><small>剑气 · ${swordEvolution(next).name}，色阶与流纹增强${next%5===0?' · 终结爆发进阶':''}</small></div>`;
   }
   camp() {
     const cost = 100 + this.state.save.boons.power * 65;
-    this.open(`<span class="kicker">SANCTUARY / 灯火长明</span><h1>在此，重整心神。</h1><p>生命、护罩、灵力与耐力已恢复。灯台已记录为新的归途。</p><div class="camp-upgrade">${itemIcon(2)}<div><h3>淬炼灵锋</h3><p>基础攻击 +12%，新增一枚灵锋与一次追击</p><strong>${cost} 灵石 · 持有 ${this.state.save.gold}</strong></div></div>${this.fervorPreview()}<div class="dialog-buttons"><button class="primary" id="camp-upgrade" ${this.state.save.gold < cost || this.state.growth.stacks>=MAX_FERVOR ? 'disabled' : ''}>${this.state.growth.stacks>=MAX_FERVOR?'锋芒圆满':`淬炼 · ${cost} 灵石`}</button><button id="camp-store">商会 · 强化 · 修行</button><button id="camp-leave">继续旅途</button>${this.state.save.won ? '<button id="challenge-start">开启轮回 · 敌人更强，成长保留</button>' : ''}</div>`);
+    this.open(`<span class="kicker">SANCTUARY / 灯火长明</span><h1>在此，重整心神。</h1><p>生命、护罩、灵力与耐力已恢复。灯台已记录为新的归途。</p><div class="camp-upgrade">${itemIcon(2)}<div><h3>淬炼灵锋</h3><p>基础攻击 +12%，新增一枚灵锋与一次追击</p><strong>${cost} 灵石 · 持有 ${this.state.save.gold}</strong></div></div>${this.fervorPreview()}<div class="dialog-buttons"><button class="primary" id="camp-upgrade" ${this.state.save.gold < cost || this.state.growth.stacks>=MAX_FERVOR ? 'disabled' : ''}>${this.state.growth.stacks>=MAX_FERVOR?'锋芒圆满':`淬炼 · ${cost} 灵石`}</button><button id="camp-store">商会 · 强化 · 修行</button><button id="camp-leave">继续旅途</button>${this.state.save.won ? '<button id="challenge-start">开启轮回 · 敌人增强，地面装备结算入包</button>' : ''}</div>`);
     this.dialog.querySelector('#camp-upgrade').onclick = () => { if (this.state.upgrade()) { this.game.save(); this.game.audio.play('level'); this.camp(); } };
     this.dialog.querySelector('#camp-store').onclick=()=>this.shop();
     this.dialog.querySelector('#camp-leave').onclick = () => this.close();
@@ -122,7 +142,7 @@ export class GameUI {
   }
   defeat() {
     this.open(`<span class="kicker">轮回未尽</span><h1>灯火还在，归来便是。</h1><p>已解开的封印、装备与成长都会保留。</p><button class="primary" id="revive-button">于灯台重生 <span>→</span></button>`); this.dialog.querySelector('.dialog-close').hidden = true;
-    this.dialog.querySelector('#revive-button').onclick = () => { this.state.revive();this.deferredBoon=this.deferredVictory=false;this.state.pendingBoons?this.boon():this.close(); this.game.cameraSnap = true; };
+    this.dialog.querySelector('#revive-button').onclick = () => { this.state.revive();this.deferredBoon=false;this.close(); this.game.cameraSnap = true; };
   }
   victory() {
     const s = this.state.save;
@@ -132,8 +152,12 @@ export class GameUI {
   toast(text) { const e = document.querySelector('#game-toast'); e.textContent = text; e.classList.add('visible'); this.toastTimer = 4; }
   region(zone) { document.querySelector('#region-name').textContent = zone.name; document.querySelector('#region-sub').textContent = zone.sub; document.querySelector('#region-toast').classList.add('visible'); this.regionTimer = 3.8; }
   handle(event) {
+    if (this.state.dead && ['level','victory','memory','camp','awakeningEnd'].includes(event.type)) {
+      if (event.type === 'victory') this.deferredVictory = true;
+      return;
+    }
     if(event.type==='awakeningUnlocked')this.toast(event.text);
-    if(event.type==='awakeningEnd'){
+        if(event.type==='awakeningEnd'){
       if(this.deferredVictory){this.deferredVictory=false;this.deferredBoon=false;this.victory();}
       else if(this.deferredBoon){this.deferredBoon=false;if(this.state.pendingBoons)this.boon();}
     }
@@ -148,13 +172,20 @@ export class GameUI {
     if (event.type === 'region') this.region(event.zone);
     if (event.type === 'camp') this.camp(); if (event.type === 'defeat') this.defeat();
     if (event.type === 'memory') this.open(`<span class="kicker">ECHOES / 旧世回声</span><h1>${event.name}</h1><p class="memory-text">${event.text}</p><button class="primary" id="memory-close">收起残简</button>`), this.dialog.querySelector('#memory-close').onclick = () => this.close();
-    if (event.type === 'victory') {if(this.state.awakening.active)this.deferredVictory=true;else this.victory();}
-    if (event.type === 'level' && !this.state.save.won) {if(this.state.awakening.active)this.deferredBoon=true;else this.boon();}
+    if (event.type === 'victory') {if(this.state.awakening.active||this.lootRevealTime>0)this.deferredVictory=true;else this.victory();}
+    if (event.type === 'level' && this.state.pendingBoons && !this.state.dead) {if(this.state.awakening.active||this.lootRevealTime>0)this.deferredBoon=true;else if (!this.dialog?.open) this.boon();}
     if (event.type === 'hurt') { document.querySelector('#hurt-vignette').classList.add('active'); this.hurtTimer = .25; }
     if (event.type === 'bossPhase') this.toast(['','无相 · 星陨之式','无相 · 万象俱灭'][event.phase]);
   }
   drawMap(canvas = this.mapCanvas) { this.atlas.draw(canvas); }
   update(dt, fps, calls) {
+    if (this.lootRevealTime > 0) {
+      this.lootRevealTime = Math.max(0,this.lootRevealTime - dt);
+      if (!this.lootRevealTime && !this.state.awakening.active && !this.state.dead && !this.dialog.open) {
+        if (this.deferredVictory) { this.deferredVictory=false; this.deferredBoon=false; this.victory(); }
+        else if (this.deferredBoon) { this.deferredBoon=false; if(this.state.pendingBoons)this.boon(); }
+      }
+    }
     this.lootLabels?.update(dt);
     const p = this.state.player, s = this.state.save, stats = this.state.stats; this.frame++;
     this.toastTimer -= dt; this.regionTimer -= dt; this.lootTimer = (this.lootTimer || 0) - dt; this.hurtTimer = (this.hurtTimer || 0) - dt;
@@ -175,7 +206,7 @@ export class GameUI {
       [...this.skillButtons, document.querySelector('#heal-button')].forEach((b,i) => {
         const skill=SKILLS[i],time=skill?p.cooldowns[i]:p.potion,duration=skill?skill.cooldown*(1-stats.haste):18,locked=skill?.unlockLevel>s.level;
         const hasTarget=i>=3?this.state.enemies.some(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-p.x,e.z-p.z)<=32):!!this.state.lockedTarget;
-        const unavailable=!!skill&&(locked||(i>=3&&this.state.awakening.active)||p.energy<skill.cost||!hasTarget||time>.1);
+        const unavailable=skill?(locked||(i>=3&&this.state.awakening.active)||p.energy<skill.cost||!hasTarget||time>.1):(p.hp>=stats.hp||time>.1);
         b.querySelector('.cooldown-mask').style.height=`${time/duration*100}%`;b.querySelector('.cooldown-text').textContent=locked?`Lv.${skill.unlockLevel}`:time>.1?time.toFixed(time<1?1:0):'';
         b.classList.toggle('unavailable',unavailable);b.classList.toggle('locked',locked);b.setAttribute('aria-disabled',String(unavailable));
         if(i>=3)b.classList.toggle('awakening-ready',!unavailable);

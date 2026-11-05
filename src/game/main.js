@@ -1,3 +1,4 @@
+import {JourneyStorage, BACKUP_KEY} from './JourneyStorage.js';
 import './game.css';
 import './title.css';
 import './enhancements.css';
@@ -7,7 +8,9 @@ import { itemIcon } from './GameIcons.js';
 import { TitleAtmosphere } from './TitleAtmosphere.js';
 import { gameMusic } from './GameMusic.js';
 
-const save=readSave(localStorage),backup=readSave(localStorage,'frostbound.rpg.backup');let selected=save?.kind||'sword',game=null;
+let journeyStorage;
+try { journeyStorage = new JourneyStorage(localStorage); } catch { /* Private browsing can restrict storage. */ }
+const save=readSave(journeyStorage),backup=readSave(journeyStorage,BACKUP_KEY);let selected=save?.kind||'sword',game=null;
 let settings={quality:'auto',volume:.45,musicMuted:false,route:true,skillCamera:true,shake:!matchMedia('(prefers-reduced-motion: reduce)').matches};
 try{const stored=JSON.parse(localStorage.getItem(SETTINGS_KEY));if(stored){if(['auto','high','medium','low'].includes(stored.quality))settings.quality=stored.quality;settings.volume=Math.max(0,Math.min(1,Number(stored.volume)||0));settings.shake=stored.shake!==false;settings.route=stored.route!==false;settings.skillCamera=stored.skillCamera!==false;settings.musicMuted=stored.musicMuted===true;}}catch{}
 document.querySelector('#app').innerHTML=`
@@ -22,19 +25,23 @@ gameMusic.listeners.add(updateMusic);updateMusic();
 document.querySelector('#music-toggle').onclick=()=>{settings.musicMuted=!gameMusic.audio.paused&&!gameMusic.muted&&settings.volume>0;if(!settings.musicMuted&&settings.volume===0){settings.volume=.45;document.querySelector('#title-volume').value=.45;}gameMusic.configure(settings.volume,settings.musicMuted);if(!settings.musicMuted)gameMusic.start();persistSettings();};
 document.querySelector('#title-volume').oninput=e=>{settings.volume=Number(e.target.value);settings.musicMuted=false;gameMusic.configure(settings.volume,false);gameMusic.start();persistSettings();};
 const unlockMusic=e=>{if(e.target.closest?.('.music-control'))return;gameMusic.start();document.removeEventListener('pointerdown',unlockMusic);};document.addEventListener('pointerdown',unlockMusic);
-async function start(saved){
+let starting = false;
+async function start(saved, switchJourney = false){
+  if (starting) return;
+  starting = true;
+  if (journeyStorage) journeyStorage.switching = switchJourney;
   atmosphere.dispose();gameMusic.start();
   document.querySelector('#title-screen').hidden=true;document.querySelector('#game-screen').hidden=false;document.querySelector('#game-loading').hidden=false;
-  try{const{RPGGame}=await import('./RPGGame.js');game=new RPGGame(saved?.kind||selected,saved,settings);window.__rpg=game;await game.load();}
+  try{const{RPGGame}=await import('./RPGGame.js');game=new RPGGame(saved?.kind||selected,saved,settings,journeyStorage);window.__rpg=game;await game.load();}
   catch(error){console.error(error);document.querySelector('#game-loading').innerHTML='<h2>旅途暂未开启</h2><p id="load-error"></p><a class="primary" href="game.html">重新准备</a>';document.querySelector('#load-error').textContent=error.message;}
 }
 document.querySelector('#new-game').onclick=()=>{
   if(!save)return start(null);
-  const d=document.querySelector('#title-dialog');d.innerHTML='<span class="kicker">新的旅途</span><h2>开始一场新的修行？</h2><p>当前进度将备份到本地，新旅途会成为默认存档。</p><div class="dialog-buttons"><button class="primary" id="confirm-new">开始新旅途</button><button id="cancel-new">保留当前旅途</button></div>';d.showModal();d.querySelector('#cancel-new').onclick=()=>d.close();d.querySelector('#confirm-new').onclick=()=>{try{localStorage.setItem('frostbound.rpg.backup',JSON.stringify(save));}catch{}d.close();start(null);};
+  const d=document.querySelector('#title-dialog');d.innerHTML='<span class="kicker">新的旅途</span><h2>开始一场新的修行？</h2><p>当前进度将备份到本地，新旅途会成为默认存档。</p><div class="dialog-buttons"><button class="primary" id="confirm-new">开始新旅途</button><button id="cancel-new">保留当前旅途</button></div>';d.showModal();d.querySelector('#cancel-new').onclick=()=>d.close();d.querySelector('#confirm-new').onclick=()=>{d.close();start(null,true);};
 };
 if(save)document.querySelector('#continue-game').onclick=()=>start(save);
 if(backup)document.querySelector('#restore-game').onclick=()=>{
-  const d=document.querySelector('#title-dialog');d.innerHTML=`<span class="kicker">旅途仍在</span><h2>切换至 ${CLASSES[backup.kind].name}？</h2><p>等级 ${backup.level} · 已解除 ${backup.seals.filter(Boolean).length} 道封印。当前旅途会保留为上一份存档，可再次切回。</p><div class="dialog-buttons"><button class="primary" id="confirm-restore">继续这场旅途</button><button id="cancel-restore">暂不切换</button></div>`;d.showModal();d.querySelector('#cancel-restore').onclick=()=>d.close();d.querySelector('#confirm-restore').onclick=()=>{try{if(save)localStorage.setItem('frostbound.rpg.backup',JSON.stringify(save));}catch{}d.close();start(backup);};
+  const d=document.querySelector('#title-dialog');d.innerHTML=`<span class="kicker">旅途仍在</span><h2>切换至 ${CLASSES[backup.kind].name}？</h2><p>等级 ${backup.level} · 已解除 ${backup.seals.filter(Boolean).length} 道封印。当前旅途会保留为上一份存档，可再次切回。</p><div class="dialog-buttons"><button class="primary" id="confirm-restore">继续这场旅途</button><button id="cancel-restore">暂不切换</button></div>`;d.showModal();d.querySelector('#cancel-restore').onclick=()=>d.close();d.querySelector('#confirm-restore').onclick=()=>{d.close();start(backup,true);};
 };
 document.querySelector('#credits-button').onclick=()=>{const d=document.querySelector('#title-dialog');d.innerHTML='<span class="kicker">CRAFTED FOR FROSTBOUND</span><h2>世界的来处</h2><p>原创分层仙境主视觉、云雾、松枝风铃、道具图集与星环灯台概念：内置 ImageGen。武器与灯台：图生 3D 后优化。角色与动作：用户提供的 Mixamo 素材及 Three.js 官方 Mixamo 示例。植被、岩石与遗迹：Quaternius Stylized Nature MegaKit 与 Ultimate Modular Ruins，CC0。</p><p>背景音乐：BiteMe Games《Lotus Pond》，古筝与笛乐，来自 <a href="https://bitemegames.itch.io/chinese-game-music" target="_blank" rel="noopener">Chinese Game Music</a> 免费游戏配乐包。战斗与光影实时运行，音乐在本地播放。无需登录，存档保存在当前浏览器。</p><button class="primary" id="credits-close">返回</button>';d.showModal();d.querySelector('#credits-close').onclick=()=>d.close();};
 window.addEventListener('beforeunload',()=>{atmosphere.dispose();game?.dispose();gameMusic.dispose();});
