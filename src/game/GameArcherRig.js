@@ -9,7 +9,7 @@ export class GameArcherRig {
     removeEmbeddedString(model,{min:[-.014,-.565,-.192],max:[.014,.59,-.155],axis:'y',maxRemovalFraction:.08});
     this.ownedGeometry=[];model.traverse(o=>{if(o.isMesh){this.ownedGeometry.push(o.geometry);o.castShadow=o.receiveShadow=true;}});
     const size=new T.Box3().setFromObject(model).getSize(new T.Vector3()),scale=1.65/size.y;
-    model.scale.setScalar(scale);model.position.set(0,0,-.08*scale);this.group.add(model);
+    model.scale.setScalar(scale);model.position.set(0,0,-.08*scale);this.group.add(model);this.baseModel=model;this.activeModel=model;
     const bone=n=>view.model.getObjectByName('mixamorig'+n);
     this.hand=bone('LeftHand');this.index=bone('LeftHandIndex1');this.middle=bone('LeftHandMiddle1');
     this.drawHand=bone('RightHand');this.drawIndex=bone('RightHandIndex3');this.drawMiddle=bone('RightHandMiddle2');
@@ -17,9 +17,17 @@ export class GameArcherRig {
     this.grip=new T.Vector3();this.nock=new T.Vector3();this.temp=new T.Vector3();this.second=new T.Vector3();this.desired=new T.Vector3();this.jointPosition=new T.Vector3();this.from=new T.Vector3();this.to=new T.Vector3();this.socket=new T.Vector3();
     this.q=new T.Quaternion();this.parentQ=new T.Quaternion();this.deltaQ=new T.Quaternion();this.identity=new T.Quaternion();this.baseArm=new T.Quaternion();this.baseForearm=new T.Quaternion();this.corrected=false;
     this.lower=new T.Vector3(0,-.56569*scale,-.33631*scale);this.upper=new T.Vector3(0,.59072*scale,-.33631*scale);
+    this.defaultLower=this.lower.clone();this.defaultUpper=this.upper.clone();
     this.stringPositions=new Float32Array(9);const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(this.stringPositions,3).setUsage(T.DynamicDrawUsage));
     this.string=new T.Line(geometry,new T.LineBasicMaterial({color:new T.Color(.8,1.35,1.6),transparent:true,opacity:.85,depthWrite:false}));this.string.frustumCulled=false;this.group.add(this.string);view.weapon=this.group;
   }
+  installEquipment(model,tier){
+    if(this.activeModel===model)return;this.activeModel?.removeFromParent();
+    const fit=model.userData.gearFit;if(!fit)throw new Error('Bow model has no calibrated grip/string data');
+    const height=1.65+tier*.18;model.position.set(0,0,0);model.rotation.set(0,0,0);model.scale.setScalar(height);this.group.add(model);this.activeModel=model;
+    this.lower.fromArray(fit.lower).multiplyScalar(height);this.upper.fromArray(fit.upper).multiplyScalar(height);
+  }
+  restoreDefaultBow(){if(this.activeModel!==this.baseModel){this.activeModel?.removeFromParent();this.group.add(this.baseModel);this.activeModel=this.baseModel;}this.lower.copy(this.defaultLower);this.upper.copy(this.defaultUpper);}
   readGrip(out) { this.hand.getWorldPosition(out);if(this.index&&this.middle){this.index.getWorldPosition(this.temp);this.middle.getWorldPosition(this.second);out.lerp(this.temp.add(this.second).multiplyScalar(.5),.5);}return out; }
   readNock(out) { this.drawHand.getWorldPosition(out);if(this.drawIndex&&this.drawMiddle){this.drawIndex.getWorldPosition(out);this.drawMiddle.getWorldPosition(this.second);out.add(this.second).multiplyScalar(.5);}return out; }
   restore() { if(this.corrected){this.arm.quaternion.copy(this.baseArm);this.forearm.quaternion.copy(this.baseForearm);this.corrected=false;} }

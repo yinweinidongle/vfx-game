@@ -55,8 +55,8 @@ export class GameFX {
     this.targetSeal=new MagicMandala(this.group,5);this.targetSeal.mesh.visible=false;
     this.installSpirit();
     this.haloBolts=new HaloBolts(this.group,camera,defaults,state.haloVolley.bolts.length);this.haloBolts.events=state.haloVolley.bolts;
-    this.light = new T.PointLight('#73dcff', 0, 9, 2); this.group.add(this.light); this.lightAge = 0;
-    this.ascendant=new GameAscendantVFX(scene,camera,state,actors.gearTemplates.weapon);this.loot=new GameLootVFX(scene,state);this.thunder=new GameThunderVFX(scene,camera,state);this.ready=Promise.all([this.ready,this.thunder.ready,this.ascendant.ready]);
+    this.light = new T.PointLight('#73dcff', 0, 9, 2); this.group.add(this.light); this.lightAge = 0;this.baseLightPosition=new T.Vector3();this.baseLightColor=new T.Color();
+    this.ascendant=new GameAscendantVFX(scene,camera,state,actors.gearTemplates['dao-imperial']||actors.gearTemplates.weapon,{arrow:actors.assets.arrow});this.loot=new GameLootVFX(scene,state,actors.lootTemplates,camera);this.thunder=new GameThunderVFX(scene,camera,state);this.lightCues=[...this.thunder.lights,this.ascendant.light];this.ready=Promise.all([this.ready,this.thunder.ready,this.ascendant.ready]);
   }
   makeRings() {
     const g = new T.PlaneGeometry(2, 2); this.ringAges = new Float32Array(36); this.ringKinds = new Float32Array(36);this.ringColors=new Float32Array(108);
@@ -111,10 +111,10 @@ export class GameFX {
       Object.assign(p, { alive: true, x, y: heightAt(x, z) + 1, z, vx: Math.sin(a) * speed, vy: 1.5 + Math.random() * 5, vz: Math.cos(a) * speed, life: .35 + Math.random() * .65, age: 0, size: .025 + Math.random() * .065 * Math.sqrt(radius), spin: Math.random() * 10, r: color.r * 1.4, g: color.g * 1.4, b: color.b * 1.4 });
     }
     if((style?.skillStage||0)>=2&&!style.echo){const orbit=this.bursts.find(b=>!b.alive);if(orbit){this.color.set(style.skillAccent);Object.assign(orbit,{alive:true,x,z,age:-.07,radius:radius*(1.12+style.skillStage*.05),element,air:false,rank:0,r:this.color.r,g:this.color.g,b:this.color.b});}}
-    this.light.position.set(x, heightAt(x, z) + 2, z); this.light.color.copy(color); this.lightAge = .2;
+    this.baseLightPosition.set(x, heightAt(x, z) + 2, z); this.baseLightColor.copy(color); this.lightAge = .2;
   }
   handle(event) {
-    this.thunder.handle(event);this.ascendant.handle(event);
+    this.loot.handle(event);this.thunder.handle(event);this.ascendant.handle(event);
     this.spiritBolts?.handle(event);
     this.fervor.handle(event);this.shield.handle(event);this.resonance.handle(event);
     if(event.type==='revive'){this.divineAge=100;this.projectileTrails.reset();for(const slot of this.bladePool){slot.trail.reset();slot.projectile=null;slot.group.visible=false;}for(const b of this.bursts)b.alive=false;for(const p of this.shards)p.alive=false;this.melee=null;}
@@ -138,7 +138,7 @@ export class GameFX {
     }
   }
   update(dt) {
-    this.thunder.update(dt);this.ascendant.update(dt);this.loot.update();
+    this.thunder.update(dt);this.ascendant.update(dt);this.loot.update(dt);
     const t=this.state.time;this.blade.group.visible=false;this.haloBolts.update(t);this.projectileTrails.update(dt,t,this.state.projectiles);
     this.spiritBolts?.update(dt);
     this.fervor.update(dt);this.shield.update(dt);this.resonance.update(dt);
@@ -178,7 +178,8 @@ export class GameFX {
     }
     this.rings.count = rings; this.rings.instanceMatrix.needsUpdate = true; this.rings.geometry.attributes.aAge.needsUpdate = this.rings.geometry.attributes.aKind.needsUpdate = true;
     this.rings.geometry.attributes.aColor.needsUpdate=true;
-    this.updateWarnings(); this.lightAge -= dt; this.light.intensity = Math.max(0, this.lightAge) * 80;
+    this.updateWarnings(); this.lightAge -= dt; this.light.intensity = Math.max(0, this.lightAge) * 80;this.light.position.copy(this.baseLightPosition);this.light.color.copy(this.baseLightColor);this.light.distance=12;
+    for(const cue of this.lightCues)if(cue.intensity>this.light.intensity){this.light.position.copy(cue.position);this.light.color.copy(cue.color);this.light.intensity=cue.intensity;this.light.distance=24;}
     this.divineAge += dt;
     if (this.divineAge < 4.7) {
       const age = this.divineAge; this.storm.group.visible = true; this.storm.update(age + 1.6);

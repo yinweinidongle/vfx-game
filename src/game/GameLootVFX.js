@@ -1,15 +1,34 @@
 import * as T from 'three';
-import { heightAt } from './GameData.js';
-import { GEAR_RARITIES } from './GearData.js';
-/** Bounded ground markers represent real uncollected items only. */
+import {heightAt} from './GameData.js';
+import {GEAR_RARITIES} from './GearData.js';
+import {equipmentProfile} from './EquipmentCatalog.js';
+import {LootFlare} from './LootFlare.js';
+
+const CAP=96;
+/** Fifteen actual item silhouettes; instanced pools share textures and never spawn real lights. */
 export class GameLootVFX{
-  constructor(scene,state){
-    this.state=state;this.group=new T.Group();scene.add(this.group);this.dummy=new T.Object3D();this.color=new T.Color();
-    const geo=new T.OctahedronGeometry(1,0);geo.setAttribute('aTint',new T.InstancedBufferAttribute(new Float32Array(96*3),3));
-    this.gems=new T.InstancedMesh(geo,new T.ShaderMaterial({vertexShader:'attribute vec3 aTint;varying vec3 vTint,vNormal;void main(){vTint=aTint;vNormal=normalize(normalMatrix*mat3(instanceMatrix)*normal);gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}',fragmentShader:'varying vec3 vTint,vNormal;void main(){float facet=.3+max(0.,dot(normalize(vNormal),normalize(vec3(.3,.8,.5))))*.7;gl_FragColor=vec4(vTint*(facet+1.1),1.);}'}),96);this.gems.frustumCulled=false;this.group.add(this.gems);
-    const beamGeo=new T.CylinderGeometry(.08,.32,1,6,1,true);beamGeo.setAttribute('aTint',geo.getAttribute('aTint'));
-    this.beams=new T.InstancedMesh(beamGeo,new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending,vertexShader:'attribute vec3 aTint;varying vec3 vTint;varying vec2 vUv;void main(){vTint=aTint;vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}',fragmentShader:'varying vec3 vTint;varying vec2 vUv;void main(){float a=pow(1.-vUv.y,2.)*.3;gl_FragColor=vec4(vTint*1.5,a);}'}),96);this.beams.frustumCulled=false;this.group.add(this.beams);this.gems.count=this.beams.count=0;
+ constructor(scene,state,templates={},camera=null){
+  this.state=state;this.camera=camera;this.group=new T.Group();scene.add(this.group);this.dummy=new T.Object3D();this.color=new T.Color();this.buckets=new Map();this.visibleDrops=[];this.flare=new LootFlare(this.group,camera);
+  for(const [id,root]of Object.entries(templates)){
+   root.updateWorldMatrix(true,true);const parts=[],bounds=new T.Box3().setFromObject(root),clearance=-bounds.min.z;
+   root.traverse(o=>{if(!o.isMesh)return;const geo=o.geometry.clone();geo.applyMatrix4(o.matrixWorld);geo.setAttribute('aLootTint',new T.InstancedBufferAttribute(new Float32Array(CAP*3),3));const material=(Array.isArray(o.material)?o.material[0]:o.material).clone();material.onBeforeCompile=shader=>{shader.vertexShader='attribute vec3 aLootTint;varying vec3 vLootTint;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvLootTint=aLootTint;');shader.fragmentShader='varying vec3 vLootTint;\n'+shader.fragmentShader.replace('#include <opaque_fragment>','float rim=pow(clamp(1.-abs(dot(normalize(normal),normalize(vViewPosition))),0.,1.),3.);outgoingLight=max(outgoingLight,diffuseColor.rgb*.65)+vLootTint*rim*.25;\n#include <opaque_fragment>');};material.customProgramCacheKey=()=>'ground-equipment-v2';
+    const mesh=new T.InstancedMesh(geo,material,CAP);mesh.count=0;mesh.frustumCulled=false;mesh.visible=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.group.add(mesh);parts.push(mesh);
+   });this.buckets.set(id,{parts,count:0,clearance});
   }
-  update(){let count=0;const t=this.state.time;for(const d of this.state.drops){if(!d.alive||!d.gear||count>=96||Math.hypot(d.x-this.state.player.x,d.z-this.state.player.z)>48)continue;const rarity=d.gear.rarity,h=heightAt(d.x,d.z);this.color.set(GEAR_RARITIES[rarity].color);this.color.toArray(this.gems.geometry.attributes.aTint.array,count*3);this.dummy.position.set(d.x,h+.24+Math.sin(t*2.5+count)*.055,d.z);this.dummy.rotation.set(.2,t*.7,0);this.dummy.scale.set(.1+rarity*.025,.18+rarity*.04,.1+rarity*.025);this.dummy.updateMatrix();this.gems.setMatrixAt(count,this.dummy.matrix);this.dummy.position.y=h+.45+rarity*.18;this.dummy.rotation.set(0,0,0);this.dummy.scale.set(1+rarity*.2,.9+rarity*.36,1+rarity*.2);this.dummy.updateMatrix();this.beams.setMatrixAt(count++,this.dummy.matrix);}this.gems.count=this.beams.count=count;this.gems.instanceMatrix.needsUpdate=this.beams.instanceMatrix.needsUpdate=true;this.gems.geometry.attributes.aTint.needsUpdate=true;}
-  dispose(){for(const m of [this.gems,this.beams]){m.geometry.dispose();m.material.dispose();}this.group.removeFromParent();}
+  const beamGeo=new T.CylinderGeometry(.025,.07,1,6,1,true);beamGeo.setAttribute('aTint',new T.InstancedBufferAttribute(new Float32Array(CAP*3),3));
+  this.beams=new T.InstancedMesh(beamGeo,new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,forceSinglePass:true,blending:T.AdditiveBlending,vertexShader:'attribute vec3 aTint;varying vec3 vTint;varying vec2 vUv;void main(){vTint=aTint;vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}',fragmentShader:'varying vec3 vTint;varying vec2 vUv;void main(){float core=pow(max(0.,sin(vUv.x*3.14159)),3.);float a=pow(1.-vUv.y,2.)*(.08+core*.09);gl_FragColor=vec4(vTint*1.7,a);}'}),CAP);this.beams.count=0;this.beams.frustumCulled=false;this.group.add(this.beams);
+ }
+ handle(event){if(event.type==='gearDrop'||event.type==='gearLand')this.flare.emit(event);}
+ update(dt=0){
+  this.visibleDrops.length=0;for(const bucket of this.buckets.values())bucket.count=0;let beams=0;
+  for(const d of this.state.drops){if(!d.alive||!d.gear||this.visibleDrops.length>=CAP||Math.hypot(d.x-this.state.player.x,d.z-this.state.player.z)>40)continue;
+   d.modelId ||=equipmentProfile(d.gear,this.state.kind).id;const bucket=this.buckets.get(d.modelId);if(!bucket)continue;this.visibleDrops.push(d);const rarity=d.gear.rarity,flight=d.flight||.7,t=Math.min(1,d.age/flight),size=(d.gear.slot==='wings'?1.15:d.gear.slot==='weapon'?1.02:.77)*(1+rarity*.035),seed=d.seed||d.lootId*.7,clearance=bucket.clearance*size+.015;
+   this.color.set(GEAR_RARITIES[rarity].color);this.dummy.position.set(d.x,(d.y??heightAt(d.x,d.z)+.14)-.14+clearance,d.z);this.dummy.rotation.set(-Math.PI/2*t+Math.sin(seed)*.7*(1-t),seed+(1-t)*Math.PI*2,Math.cos(seed)*.6*(1-t),'YXZ');this.dummy.scale.setScalar(size);this.dummy.updateMatrix();for(const mesh of bucket.parts){mesh.setMatrixAt(bucket.count,this.dummy.matrix);this.color.toArray(mesh.geometry.attributes.aLootTint.array,bucket.count*3);}bucket.count++;
+   if(t>=1&&rarity>0&&beams<CAP){const h=rarity===2?1.9:1.2;this.dummy.position.set(d.x,heightAt(d.x,d.z)+h*.5,d.z);this.dummy.rotation.set(0,0,0);this.dummy.scale.set(1,h,1);this.dummy.updateMatrix();this.beams.setMatrixAt(beams,this.dummy.matrix);this.color.toArray(this.beams.geometry.attributes.aTint.array,beams++*3);}
+  }
+  for(const bucket of this.buckets.values())for(const mesh of bucket.parts){mesh.count=bucket.count;mesh.visible=bucket.count>0;if(bucket.count){mesh.instanceMatrix.needsUpdate=true;mesh.geometry.attributes.aLootTint.needsUpdate=true;}}
+  this.beams.count=beams;this.beams.instanceMatrix.needsUpdate=beams>0;this.beams.geometry.attributes.aTint.needsUpdate=beams>0;
+  this.flare.update(dt);
+ }
+ dispose(){this.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});this.group.removeFromParent();}
 }

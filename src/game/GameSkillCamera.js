@@ -28,7 +28,7 @@ export class GameSkillCamera{
         const a=g.state.awakening,blade=this.index===4,reveal=T.MathUtils.smoothstep(t,.5,1.6);
         this.focus.set(a.cx??this.target.x,heightAt(a.cx??this.target.x,a.cz??this.target.z)+(blade?7.5-reveal*5.:1.8),a.cz??this.target.z);
         const orbit=blade?0:Math.max(0,t-1.4)*.12;
-        this.eye.copy(this.focus).addScaledVector(this.side,(blade?19:18)*Math.cos(orbit)).addScaledVector(this.forward,(blade?-19:-15)+Math.sin(orbit)*10);
+        this.eye.copy(this.focus).addScaledVector(this.side,(blade?-19:18)*Math.cos(orbit)).addScaledVector(this.forward,(blade?-19:-15)+Math.sin(orbit)*10);
         this.eye.y+=blade?5+reveal*13:5+reveal*18;fov=blade?52:53;
         this.label=awakeningStyle(g.state.kind,this.index).name+(t<1.25?' · 觉醒':blade?' · 天刃降临':' · 冰劫领域');
       }else if(this.index===3){

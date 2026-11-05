@@ -1,3 +1,5 @@
+import { createLootMotion } from './LootMotion.js';
+import { weaponKind } from './EquipmentCatalog.js';
 import { GEAR_CAPACITY,GEAR_SLOTS,GEAR_RARITIES,gearName,lootRoll,enhancementInfo,gearSellValue,cultivationCost,shopStock } from './GearData.js';
 import { INTERACTABLES,distance } from './GameData.js';
 
@@ -11,16 +13,17 @@ export class GameGear{
     const s=this.state;if(!Object.hasOwn(GEAR_SLOTS,spec.slot)||!Number.isInteger(spec.rarity)||spec.rarity<0||spec.rarity>2)return null;
     if(s.save.gearBag.length>=GEAR_CAPACITY){const value=gearSellValue({...spec,enhance:spec.enhance||0});s.save.gold+=value;s.saveDirty=true;s.emit('toast',{text:`行囊已满，新装备自动回收为 ${value} 灵石。`});return null;}
     const item={uid:'g'+s.save.nextGearId++,slot:spec.slot,rarity:spec.rarity,level:Math.max(1,Math.min(50,Math.floor(spec.level||s.save.level))),enhance:Math.max(0,Math.min(20,Math.floor(spec.enhance||0)))};
+    if(item.slot==='weapon')item.weaponKind=weaponKind(spec,s.kind);
     s.save.gearBag.push(item);s.saveDirty=true;this.revision++;if(notify)s.emit('gearLoot',{item});return item;
   }
   drop(enemy){
     const s=this.state,roll=lootRoll(enemy,()=>s.random(),s.save.gearPity);
     if(!roll){s.save.gearPity++;return;}
     s.save.gearPity=0;const level=Math.min(50,Math.max(1,(enemy.level||1)+s.save.challenge*3,Math.floor(s.save.level*.85)));
-    const spec={...roll,level,enhance:0};const ground=s.drops.filter(d=>d.alive&&d.gear);if(ground.length>=96){const oldest=ground[0];oldest.alive=false;s.save.gold+=gearSellValue(oldest.gear);s.emit('toast',{text:'散落装备较多，最早的装备已自动回收为灵石。'});}
-    s.drops.push({lootId:s.save.nextLootId++,x:enemy.x,z:enemy.z,age:0,alive:true,gear:spec});this.syncGround();s.emit('gearDrop',{x:enemy.x,z:enemy.z,rarity:roll.rarity});
+    const spec={...roll,level,enhance:0};if(spec.slot==='weapon')spec.weaponKind=s.kind==='ice'?'bow':s.save.nextLootId%2?'dao':'jian';const ground=s.drops.filter(d=>d.alive&&d.gear);if(ground.length>=96){const oldest=ground[0];oldest.alive=false;s.save.gold+=gearSellValue(oldest.gear);s.emit('toast',{text:'散落装备较多，最早的装备已自动回收为灵石。'});}
+    const lootId=s.save.nextLootId++,motion=createLootMotion(enemy.x,enemy.z,lootId,roll.rarity);s.drops.push({lootId,x:enemy.x,z:enemy.z,age:0,alive:true,gear:spec,...motion});this.syncGround();s.emit('gearDrop',{lootId,x:enemy.x,y:motion.y,z:enemy.z,rarity:roll.rarity});
   }
-  syncGround(){const s=this.state;s.save.groundGear=s.drops.filter(d=>d.alive&&d.gear).slice(0,96).map(d=>({lootId:d.lootId,x:d.x,z:d.z,age:d.age,gear:{...d.gear}}));s.saveDirty=true;}
+  syncGround(dirty=true){const s=this.state;s.save.groundGear=s.drops.filter(d=>d.alive&&d.gear).slice(0,96).map(d=>({lootId:d.lootId,x:d.x,z:d.z,age:d.age,birthX:d.birthX,birthZ:d.birthZ,landX:d.landX,landZ:d.landZ,flight:d.flight,arc:d.arc,landed:d.landed,seed:d.seed,gear:{...d.gear}}));if(dirty)s.saveDirty=true;}
   equip(uid){const item=this.find(uid);if(!item||this.state.dead)return false;this.state.save.gearEquipped[item.slot]=uid;this.changed();this.state.emit('gearEquipped',{item});return true;}
   unequip(slot){if(!Object.hasOwn(GEAR_SLOTS,slot)||!this.state.save.gearEquipped[slot])return false;delete this.state.save.gearEquipped[slot];this.changed();return true;}
   sell(uid){const item=this.find(uid),s=this.state;if(!item||Object.values(s.save.gearEquipped).includes(uid))return false;s.save.gold+=gearSellValue(item);s.save.gearBag.splice(s.save.gearBag.indexOf(item),1);s.saveDirty=true;this.revision++;s.emit('toast',{text:`已回收 ${gearName(item)}，获得 ${gearSellValue(item)} 灵石。`});return true;}

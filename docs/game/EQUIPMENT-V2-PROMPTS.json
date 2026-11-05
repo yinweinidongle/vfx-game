@@ -1,0 +1,50 @@
+[
+  {
+    "asset": "wings-star",
+    "path": "assets/rpg-source/art/equipment/variants/wings-star-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. Production image-to-3D reference, one isolated COMPLETE SYMMETRICAL PAIR of celestial Chinese xianxia wings. Two elegant swept-back crescent wings with precisely layered silver and indigo blade-like feathers, translucent sapphire crystalline inner feathers, an antique-gold central back mounting clasp, two long streamlined outer quills, impressive but restrained mid-tier silhouette. Both wings are physically connected by a small solid back harness. Front orthographic view, spread open, slight backward sweep, clear three-dimensional thickness. Premium PBR anime action RPG equipment design, fine sculpted feather bevels, blue gemstone inlays, subtle cool glow WITHOUT floating effects. No body, no human, no pedestal, no labels, no background, generous transparent margin. Sharp production-quality object rendering, silver/navy/azure palette."
+  },
+  {
+    "asset": "wings-phoenix",
+    "path": "assets/rpg-source/art/equipment/variants/wings-phoenix-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. Production image-to-3D reference, one isolated COMPLETE SYMMETRICAL PAIR of majestic imperial phoenix wings for an original xianxia action RPG. Enormous ceremonial three-tier feather wings: central antique-gold articulated mounting clasp; sweeping deep violet and midnight-blue layered feathers with ornate gold filigree ribs; eight long elegantly tapered golden crystalline phoenix flight feathers along each outer silhouette, restrained luminous amber crystal tips. Luxurious high-tier artifact, striking distinct fan-shaped silhouette, real solid geometry and clear layered feather depth, slightly upswept tips, thin graceful proportion suitable on a human back. Front orthographic view, both wings attached to a central harness, fully visible with ample transparent margin. Exquisite PBR sculpted metal, gemstone and feather surface, tasteful emission not a glowing cloud. No character, text, pedestal, scenery or loose disconnected particles."
+  },
+  {
+    "asset": "cloak-star",
+    "path": "assets/rpg-source/art/equipment/variants/cloak-star-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. Isolated original xianxia RPG wearable cloak, production reference for image-to-3D. ONE empty elegant midnight-indigo LONG CLOAK, seen from its BACK in a neutral gently spread hanging pose. Solid small gold and silver collar clasp connects two shoulder points, narrow shoulder width, beautiful layered draped fabric folds, silver embroidered constellation border, sapphire ornamental panels, asymmetrical split pointed lower tails. Open front has no body or mannequin. Entire fabric garment fully visible, real thickness at hems, sober refined mid-tier celestial artifact, blue-violet silk with fine embroidered details, sculpted three-dimensional surface and restrained gemstone accents. Clean orthographic rear view, transparent background, ample margins, no text, no pedestal, no human, no floating effects."
+  },
+  {
+    "asset": "cloak-imperial",
+    "path": "assets/rpg-source/art/equipment/variants/cloak-imperial-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. Isolated highest-tier imperial celestial cloak, original premium xianxia action RPG equipment, production image-to-3D reference. ONE magnificent long royal cloak displayed from the BACK, empty but naturally hung from a narrow ornate antique-gold collar clasp and two modest shoulder mounts. Rich midnight-black and crimson-violet brocade silk, intricate flowing antique-gold phoenix embroidery along outer borders and the middle, layered large sweeping twin swallowtail panels, red inner lining visible in folds, three long gold-edged trailing fabric ribbons attached at lower hem, gracefully tapered points. Grand ceremonial silhouette and highly detailed relief embroidery, garment fabric dominates not armor, narrow human-compatible shoulders and wide flowing bottom. Complete object with fully contained tails and generous margins, rear orthographic view, transparent background. No character, mannequin, text, pedestal, scenery or loose particles."
+  },
+  {
+    "asset": "bow-star",
+    "path": "assets/rpg-source/art/equipment/variants/bow-star-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. ONE isolated complete original celestial recurve BOW, production image-to-3D reference for a premium xianxia action RPG. Refined mid-tier silver and sapphire longbow with a slim unobstructed dark wrapped central handgrip, two curved silver dragon-rib limbs, layered blue crystalline fin plates at each limb, silver filigree and blue gemstone joints, a single taut thin visible bowstring connects both tips behind the grip. Vertical upright silhouette, bow shooting direction points to viewer right, grip exactly in middle; no arrow and no accessories. Elegant precise usable weapon proportions, real PBR metal and crystalline material, crisp bevels and fine engraved cloud motifs, restrained cyan edge sheen. Front/side orthographic catalogue view, whole bow fully contained with generous transparent margins, no hands, character, text, pedestal, scenery or glow cloud."
+  },
+  {
+    "asset": "bow-imperial",
+    "path": "assets/rpg-source/art/equipment/variants/bow-imperial-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. ONE isolated majestic highest-tier imperial star-dragon BOW for an original premium xianxia action RPG, production image-to-3D reference. Long elegant recurved limbs form two opposing gold celestial dragon heads, midnight violet metal inset panels, layered gold and violet crystal antler blades swept away from the central shooting corridor, large amber star-crystal at each limb junction. Slim dark central handgrip clearly accessible; a single taut visible thin gold bowstring between tips behind the grip; arrow corridor unobstructed. Grand refined symmetrical vertical silhouette, narrow body, exquisite fine gold relief engravings and inlaid luminous purple/amber gems, actual solid layered geometry, PBR sculpted details, minimal restrained glow. Complete bow vertical upright, front/side orthographic view, firing direction to viewer right, fully visible with generous transparent margins. No arrow, human, text, pedestal, scenery or disconnected particles."
+  },
+  {
+    "asset": "dao-imperial",
+    "path": "assets/rpg-source/art/equipment/variants/dao-imperial-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. ONE isolated very long magnificent imperial Chinese celestial DAO, a practical SINGLE-EDGED curved blade for an original xianxia action RPG. Blade points vertically UP, dark red wrapped handle and small solid pommel at BOTTOM; clear ornate antique-gold dragon guard separates grip from blade at about 20% of overall height. Elegant broad polished silver blade with one cutting edge on the viewer RIGHT, slightly curved piercing tip, black-violet engraved spine, gold dragon-shaped relief reinforcement along blunt left spine, inset ruby and amber runes. Grand highest-tier artifact with real detailed metal bevels and crystal inlays, strong sharp asymmetric silhouette, not a sword or staff, not oversized impractical spikes. Entire object fully visible, exact front orthographic view, transparent background, generous margins, PBR game asset concept, no hands, text, pedestal, scenery or floating magical effects."
+  },
+  {
+    "asset": "jian-imperial",
+    "path": "assets/rpg-source/art/equipment/variants/jian-imperial-v2.png",
+    "mode": "built-in image_gen",
+    "prompt": "Use case: stylized-concept. ONE isolated exquisite highest-tier Chinese celestial JIAN, straight symmetrical DOUBLE-EDGED sword for an original premium xianxia action RPG, image-to-3D production reference. Very long narrow polished silver twin-edged blade pointing vertically UP; gold phoenix wing guard at about 20% of overall height, dark navy wrapped handgrip and jade/gold pommel at BOTTOM. Slender elegant blade with blue-violet crystalline central fuller, fine ascending antique-gold engravings, gemstone insets along the spine, delicate two small solid guard ornaments, precise beveled edges. Impressive imperial long-sword silhouette, luxuriously detailed without blocking the grip, premium PBR stylized realism with restrained sapphire emission. Exact front orthographic view, full weapon fully contained in ample transparent margin. No scabbard, no hands, no character, no text, no pedestal, no scenery or disconnected particles."
+  }
+]

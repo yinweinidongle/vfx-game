@@ -1,7 +1,8 @@
 import { gameMusic } from './GameMusic.js';
+import { LootSound } from './LootSound.js';
 /** Local instrumental music and responsive synthesized combat SFX. */
 export class GameAudio {
-  constructor(volume = .5) { this.volume = volume; this.context = null; this.nextNote = 0; this.noteIndex = 0; }
+  constructor(volume = .5) { this.volume = volume; this.context = null; this.nextNote = 0; this.noteIndex = 0; this.loot = new LootSound(this); }
   start() {
     if(this.disposed)return;
     if (!this.context) {
@@ -60,5 +61,5 @@ export class GameAudio {
   update() {if(this.duckUntil&&this.context?.currentTime>=this.duckUntil){this.duckUntil=0;gameMusic.duck(1);}}
   pause() { if(!this.disposed)this.context?.suspend().catch(()=>{}); gameMusic.pause(); }
   resume() { if(!this.disposed&&this.context?.state!=='closed')this.context?.resume().catch(()=>{}); gameMusic.start(); }
-  dispose() { if(this.disposed)return;this.stopAwakening();this.disposed=true;this.wind?.stop();this.context?.close().catch(()=>{}); }
+  dispose() { if(this.disposed)return;this.stopAwakening();this.loot.dispose();this.disposed=true;this.wind?.stop();this.context?.close().catch(()=>{}); }
 }

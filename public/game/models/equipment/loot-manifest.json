@@ -1,0 +1,62 @@
+{
+  "armor-v1": {
+    "sourceTriangles": 9998,
+    "triangles": 650
+  },
+  "boots-v1": {
+    "sourceTriangles": 9996,
+    "triangles": 648
+  },
+  "wings-v1": {
+    "sourceTriangles": 9998,
+    "triangles": 650
+  },
+  "cloak-v1": {
+    "sourceTriangles": 9990,
+    "triangles": 642
+  },
+  "weapon-v1": {
+    "sourceTriangles": 10000,
+    "triangles": 650
+  },
+  "bow-base": {
+    "sourceTriangles": 26126,
+    "triangles": 650
+  },
+  "jian-base": {
+    "sourceTriangles": 13460,
+    "triangles": 650
+  },
+  "wings-star": {
+    "sourceTriangles": 7999,
+    "triangles": 649
+  },
+  "wings-phoenix": {
+    "sourceTriangles": 7994,
+    "triangles": 650
+  },
+  "cloak-star": {
+    "sourceTriangles": 7000,
+    "triangles": 642
+  },
+  "cloak-imperial": {
+    "sourceTriangles": 6994,
+    "triangles": 624
+  },
+  "bow-star": {
+    "sourceTriangles": 7000,
+    "triangles": 650
+  },
+  "bow-imperial": {
+    "sourceTriangles": 6999,
+    "triangles": 638
+  },
+  "dao-imperial": {
+    "sourceTriangles": 7000,
+    "triangles": 640
+  },
+  "jian-imperial": {
+    "sourceTriangles": 7000,
+    "triangles": 650
+  }
+}

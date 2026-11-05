@@ -1,3 +1,4 @@
+import { advanceLoot } from './LootMotion.js';
 import { BOONS, CLASSES, ENCOUNTERS, INTERACTABLES, ITEMS, SAVE_KEY, SKILLS, clamp, distance, heightAt, isLand, segmentDistance, zoneAt } from './GameData.js';
 import { attackGrowth, projectileColor, MAX_FERVOR } from './AttackGrowth.js';
 import { GameFervorVolley } from './GameFervorVolley.js';
@@ -69,7 +70,7 @@ export class GameState {
     const spirit=spiritGrowth(b.spirit),gear=equippedGearStats(this.save,gearEquipped);
     return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality')+gear.hp, damage: (c.damage+gear.damage) * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier+gear.regen, energyMax:spirit.energyMax+gear.energyMax, speed: c.speed*(1+Math.min(.65,gear.speed)),attackSpeed:1+Math.min(1.4,gear.attackSpeed) };
   }
-  write(storage) { try { storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
+  write(storage) { try { this.gear.syncGround(false);storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
   objective() {
     if (this.save.won) { const camp=INTERACTABLES.filter(i=>i.type==='camp').sort((a,b)=>distance(a,this.player)-distance(b,this.player))[0];return { title:'归墟已醒',text:'回到任意灯台，开启更高难度的轮回。',x:camp.x,z:camp.z }; }
     if (!this.save.seals[0]) return { title: '第一章 · 风雪旧梦', text: this.save.cleared.includes('frostkeeper') ? '激活听雪封印' : '击败北方的封印守望者', x: -24, z: -16 };
@@ -275,10 +276,12 @@ export class GameState {
       if (z.age > z.life) z.alive = false;
     }
     for (const d of this.drops) if (d.alive) {
-      d.age += dt; const len = distance(d, p);
-      if (len < 7) { const t = Math.min(1, dt * (2 + d.age * 2)); d.x += (p.x - d.x) * t; d.z += (p.z - d.z) * t; }
-      if (len < (d.gear?1.2:.6)) { d.alive = false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}else{p.hp = Math.min(this.stats.hp, p.hp + 4); p.energy = Math.min(this.stats.energyMax, p.energy + 2);}this.emit('pickup'); }
-      if(d.age>(d.gear?120:20)){d.alive=false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}}
+      d.age += dt;
+      if(d.gear){if(advanceLoot(d,dt,p))this.emit('gearLand',{lootId:d.lootId,x:d.x,y:d.y,z:d.z,rarity:d.gear.rarity});}
+      const len = distance(d, p);
+      if (!d.gear&&len < 7) { const t = Math.min(1, dt * (2 + d.age * 2)); d.x += (p.x - d.x) * t; d.z += (p.z - d.z) * t; }
+      if (len < (d.gear?1.2:.6)&&(!d.gear||d.age>(d.flight||.7)+.24)) { d.alive = false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}else{p.hp = Math.min(this.stats.hp, p.hp + 4); p.energy = Math.min(this.stats.energyMax, p.energy + 2);}this.emit('pickup'); }
+      if(d.alive&&d.age>(d.gear?120:20)){d.alive=false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}}
     }
     if(this.drops.length>192)this.drops=this.drops.filter(d=>d.alive);
     let near = null, best = 3;

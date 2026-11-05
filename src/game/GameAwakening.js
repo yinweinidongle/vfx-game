@@ -6,6 +6,7 @@ export class GameAwakening {
   constructor(state) {
     this.state=state;this.active=false;this.age=0;this.generation=0;
     this.strikes=Array.from({length:192},(_,id)=>({id,active:false,hit:false,warned:false}));
+    this.icePlans=Array.from({length:360},(_,id)=>({id,active:false}));this.iceCount=0;this.warnPulse=0;
     this.hitByWave=Array.from({length:9},()=>new Set());this.count=0;
   }
   eligible(e) { return e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-this.x,e.z-this.z)<=AWAKENING_RANGE; }
@@ -13,7 +14,7 @@ export class GameAwakening {
     const s=this.state,p=s.player;this.reset();this.active=true;this.index=index;this.generation++;this.x=p.x;this.z=p.z;this.yaw=p.yaw;this.damage=s.stats.damage*s.spirit.damage;this.style=awakeningStyle(s.kind,index);
     this.duration=this.style.duration||AWAKENING_DURATION;
     if(index>=4){
-      this.target=s.lockedTarget;this.cx=this.target?.x??p.x;this.cz=this.target?.z??p.z;this.pulse=0;this.marked=false;this.locked=false;
+      this.target=s.lockedTarget;this.cx=this.target?.x??p.x;this.cz=this.target?.z??p.z;this.pulse=0;this.warnPulse=0;this.iceCount=0;this.marked=false;this.locked=false;
       s.emit('awakening',{index,kind:s.kind,x:this.x,z:this.z,targetX:this.cx,targetZ:this.cz,yaw:p.yaw,...this.style});return;
     }
     // Snapshot the invocation power, then track moving enemies only until each strike lands.
@@ -67,17 +68,25 @@ export class GameAwakening {
         s.emit('heavenCleave',{x:this.cx,y:heightAt(this.cx,this.cz),z:this.cz,yaw:this.yaw,wave,color:this.style.color});
       }
     }else{
+      while(this.warnPulse<9&&t>=1.12+this.warnPulse*.38-.28){
+        const wave=this.warnPulse++,at=1.12+wave*.38;let count=0;
+        for(const e of s.enemies){if(!this.eligible(e)||Math.hypot(e.x-this.cx,e.z-this.cz)>10.5+e.scale*.25||count++>=40)continue;
+          const plan=this.icePlans[this.iceCount++];Object.assign(plan,{active:true,x:e.x,y:heightAt(e.x,e.z),z:e.z,wave,at,seed:e.id+wave*71+this.generation*137,final:wave===8});
+          s.emit('glacialLance',{x:plan.x,y:plan.y,z:plan.z,seed:plan.seed,wave,final:plan.final,duration:Math.max(.01,at-t)});
+        }
+      }
       while(this.pulse<9&&t>=1.12+this.pulse*.38){
-        const wave=this.pulse++,final=wave===8;let count=0;
-        for(const e of s.enemies){if(!this.eligible(e)||Math.hypot(e.x-this.cx,e.z-this.cz)>10.5+e.scale*.25)continue;
-          s.hit(e,this.damage*(final?4.8:1.05),'awakening',{color:this.style.color,radiance:1.7,skillAccent:this.style.accent});
-          e.frozen=Math.max(e.frozen,e.type==='boss'?.16:e.elite?.3:.6);
-          if(count++<40)s.emit('glacialStrike',{x:e.x,y:heightAt(e.x,e.z),z:e.z,wave,seed:e.id+wave*71+this.generation*137,final});
+        const wave=this.pulse++,final=wave===8,hits=this.hitByWave[wave];
+        for(let i=0;i<this.iceCount;i++){const plan=this.icePlans[i];if(plan.wave!==wave)continue;
+          for(const e of s.enemies){if(hits.has(e.id)||!this.eligible(e)||Math.hypot(e.x-this.cx,e.z-this.cz)>10.5+e.scale*.25||Math.hypot(e.x-plan.x,e.z-plan.z)>2.4+e.scale*.25)continue;
+            hits.add(e.id);s.hit(e,this.damage*(final?4.8:1.05),'awakening',{color:this.style.color,radiance:1.7,skillAccent:this.style.accent});e.frozen=Math.max(e.frozen,e.type==='boss'?.16:e.elite?.3:.6);
+          }
+          s.emit('glacialStrike',{x:plan.x,y:plan.y,z:plan.z,wave,seed:plan.seed,final});
         }
         s.emit('glacialPulse',{x:this.cx,y:heightAt(this.cx,this.cz),z:this.cz,wave,final,radius:10.5});
       }
     }
     if(t>=this.duration){this.active=false;s.emit('awakeningEnd');}
   }
-  reset(){this.active=false;this.age=0;this.count=0;for(const strike of this.strikes){strike.active=false;strike.hit=true;}for(const hits of this.hitByWave)hits.clear();}
+  reset(){this.iceCount=0;this.warnPulse=0;for(const plan of this.icePlans)plan.active=false;this.active=false;this.age=0;this.count=0;for(const strike of this.strikes){strike.active=false;strike.hit=true;}for(const hits of this.hitByWave)hits.clear();}
 }

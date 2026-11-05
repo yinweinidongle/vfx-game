@@ -42,7 +42,7 @@ export class GameThunderVFX {
       vertexShader:'attribute float aFade;varying float vFade;void main(){vFade=aFade;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}',
       fragmentShader:'uniform vec3 uTint,uCore;varying float vFade;void main(){gl_FragColor=vec4(mix(uTint*1.6,uCore*2.5,vFade*.5),vFade);}' }),SPARKS);
     this.sparkMesh.count=0;this.sparkMesh.frustumCulled=false;this.sparkMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.group.add(this.sparkMesh);
-    this.lights=Array.from({length:4},()=>{const light=new T.PointLight(this.style.color,0,11,2);light.userData.age=10;this.group.add(light);return light;});
+    this.lights=Array.from({length:4},()=>{return {position:new T.Vector3(),color:new T.Color(this.style.color),intensity:0,userData:{age:10}};});
     this.ready=loadTexture?new T.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}game/art/awakening/lightning-v1.webp`).then(texture=>{
       if(this.disposed){texture.dispose();return;}texture.colorSpace=T.NoColorSpace;texture.minFilter=T.LinearMipmapLinearFilter;texture.magFilter=T.LinearFilter;boltMaterial.uniforms.uMap.value=texture;this.texture.dispose();this.texture=texture;
     }):Promise.resolve();

@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {GameState,readSave} from '../src/game/GameState.js';
-import {GEAR_SLOTS,GEAR_CAPACITY,gearStats,enhancementInfo,enhancementStyle,lootRoll,gearSellValue} from '../src/game/GearData.js';
+import {GEAR_SLOTS,GEAR_CAPACITY,gearStats,enhancementInfo,enhancementStyle,lootRoll,gearSellValue,shopStock} from '../src/game/GearData.js';
 
 const add=(s,slot,extra={})=>s.gear.grant({slot,level:20,rarity:1,...extra},false);
+
+test('legacy purchased weapons remain sold when the new bow/dao/jian stock is introduced',()=>{
+ for(const kind of ['ice','sword','cultivator']){const save={kind,level:40,shopEpoch:2,shopBought:['2-weapon-2']},stock=shopStock(save);assert.equal(stock.find(g=>g.slot==='weapon'&&g.rarity===2&&g.weaponKind===(kind==='ice'?'bow':'dao')).sold,true);if(kind!=='ice')assert.equal(stock.find(g=>g.weaponKind==='jian'&&g.rarity===2).sold,false);}
+});
 
 test('equipment saves migrate alongside all legacy relics; invalid or duplicated instances cannot equip',()=>{
  const s=new GameState();s.save.inventory=['jade'];s.save.equipment.charm='jade';delete s.save.gearBag;delete s.save.gearEquipped;
@@ -46,12 +50,12 @@ test('enhancement is monotonic through +20, consumes each attempt once, and fail
 test('drop rates favour common gear, elites improve rare outcomes, bosses always drop and pity caps dry streaks',()=>{
  function sample(enemy){let n=0,drop=0,counts=[0,0,0];const rand=()=>{n=(Math.imul(n||9137,1664525)+1013904223)>>>0;return n/4294967296;};for(let i=0;i<30000;i++){const g=lootRoll(enemy,rand);if(g){drop++;counts[g.rarity]++;}}return {drop,counts};}
  const a=sample({}),e=sample({elite:true}),b=sample({type:'boss'});for(const r of [a,e,b])assert.ok(r.counts[0]>r.counts[1]&&r.counts[1]>r.counts[2]);assert.ok(e.drop>a.drop*2);assert.equal(b.drop,30000);assert.ok(e.counts[2]/e.drop>a.counts[2]/a.drop);assert.ok(lootRoll({},()=>.99,11));assert.equal(lootRoll({},()=>.99,10),null);
- const s=new GameState();s.started=new Set();s.random=()=>.99;for(let i=0;i<12;i++)s.gear.drop({x:s.player.x,z:s.player.z,level:1});assert.equal(s.drops.length,1);s.update(1/60,{dx:0,dz:0});assert.equal(s.save.gearBag.length,1);assert.equal(s.drops[0].alive,false);
+ const s=new GameState();s.started=new Set();s.random=()=>.99;for(let i=0;i<12;i++)s.gear.drop({x:s.player.x,z:s.player.z,level:1});assert.equal(s.drops.length,1);s.player.invulnerable=99;s.update(1/60,{dx:0,dz:0});assert.equal(s.save.gearBag.length,0,'throw must complete before pickup');for(let i=0;i<100;i++)s.update(1/60,{dx:0,dz:0});assert.equal(s.save.gearBag.length,1);assert.equal(s.drops[0].alive,false);
 });
 
 
 test('uncollected gear survives refresh and pickup cannot duplicate it; malformed ground entries cannot erase an otherwise valid save',()=>{
  const s=new GameState();s.random=()=>.1;s.gear.drop({x:s.player.x,z:s.player.z-10,level:10,type:'boss'});assert.equal(s.save.groundGear.length,1);
- s.save.groundGear.push(null,{lootId:999,x:0,z:0,gear:{slot:'__proto__'}});const saved=readSave({getItem:()=>JSON.stringify(s.save)});assert.ok(saved);assert.equal(saved.groundGear.length,1);const restored=new GameState('sword',saved);assert.equal(restored.drops.length,1);restored.player.x=restored.drops[0].x;restored.player.z=restored.drops[0].z;restored.update(1/60,{dx:0,dz:0});assert.equal(restored.save.gearBag.length,1);assert.equal(restored.save.groundGear.length,0);restored.update(1/60,{dx:0,dz:0});assert.equal(restored.save.gearBag.length,1);
+ s.save.groundGear.push(null,{lootId:999,x:0,z:0,gear:{slot:'__proto__'}});const saved=readSave({getItem:()=>JSON.stringify(s.save)});assert.ok(saved);assert.equal(saved.groundGear.length,1);const restored=new GameState('sword',saved);assert.equal(restored.drops.length,1);restored.player.x=restored.drops[0].x;restored.player.z=restored.drops[0].z;restored.player.invulnerable=99;for(let i=0;i<100;i++)restored.update(1/60,{dx:0,dz:0});assert.equal(restored.save.gearBag.length,1);assert.equal(restored.save.groundGear.length,0);restored.update(1/60,{dx:0,dz:0});assert.equal(restored.save.gearBag.length,1);
  assert.equal(s.gear.grant({slot:'__proto__',rarity:0}),null);
 });

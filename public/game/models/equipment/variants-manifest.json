@@ -1,0 +1,60 @@
+{
+  "wings-star": {
+    "sourceTriangles": 875501,
+    "triangles": 7999
+  },
+  "wings-phoenix": {
+    "sourceTriangles": 998502,
+    "triangles": 7994
+  },
+  "cloak-star": {
+    "sourceTriangles": 999906,
+    "triangles": 7000
+  },
+  "cloak-imperial": {
+    "sourceTriangles": 999876,
+    "triangles": 6994
+  },
+  "bow-star": {
+    "sourceTriangles": 429917,
+    "triangles": 7000,
+    "gearFit": {
+      "lower": [
+        0,
+        -0.5,
+        -0.10039800219237804
+      ],
+      "upper": [
+        0,
+        0.5,
+        -0.10039800219237804
+      ],
+      "removedStringTriangles": 0
+    }
+  },
+  "bow-imperial": {
+    "sourceTriangles": 761501,
+    "triangles": 6999,
+    "gearFit": {
+      "lower": [
+        0,
+        -0.4225670099258423,
+        -0.16085701063275337
+      ],
+      "upper": [
+        0,
+        0.4239479899406433,
+        -0.16085701063275337
+      ],
+      "removedStringTriangles": 41718
+    }
+  },
+  "dao-imperial": {
+    "sourceTriangles": 566020,
+    "triangles": 7000
+  },
+  "jian-imperial": {
+    "sourceTriangles": 286603,
+    "triangles": 7000
+  }
+}

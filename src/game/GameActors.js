@@ -36,12 +36,15 @@ export class GameActors {
       fetch(`${base}game/models/enemy-motion.json`).then(r => r.json()).then(data => { this.motion.enemy = data.map(c => T.AnimationClip.parse(c)); }),
     ];
     for (const [id, file] of [['sword','storm-sword-v3'], ['bow','frost-bow-v2'], ['arrow','frost-arrow-v2']]) jobs.push(gltf.loadAsync(`${base}game/models/${file}.glb`).then(g => { this.assets[id] = g.scene; this.templates.push(g.scene); }));
-    const gearJob=GameGearAppearance.load().then(models=>{this.gearTemplates=models;this.templates.push(...Object.values(models));});
+    jobs.push(gltf.loadAsync(`${base}game/models/equipment/loot-library.glb`).then(g=>{this.lootTemplates={};for(const child of g.scene.children)this.lootTemplates[child.name]=child;this.templates.push(g.scene);}));
+    const gearJob=GameGearAppearance.load().then(models=>{this.gearTemplates=models;this.templates.push(...new Set(Object.values(models)));});
     await Promise.all([...jobs,gearJob,texturesReady]); this.player = this.create(this.playerSource, this.motion[kind], 2.1, null);
     this.addWeapon(this.player, kind === 'ice' ? 'bow' : kind === 'sword' ? 'sword' : null);
     this.weaponMaterials=[];this.growthTint=new T.Color();
     this.player.weapon?.traverse(o=>{if(!o.isMesh)return;const own=m=>{const c=m.clone();this.weaponMaterials.push(c);return c;};o.material=Array.isArray(o.material)?o.material.map(own):own(o.material);});
     this.templates.push(this.playerSource, this.enemySource);
+    this.warmActor=this.create(this.enemySource,this.motion.enemy,2.2,{elite:true,color:'#c69cff',type:'boss'});this.warmActor.group.visible=false;
+    this.gearTemplates['jian-base']=this.assets.sword;this.gearTemplates['bow-base']=this.assets.bow;
     this.gearAppearance=new GameGearAppearance(this.player,this.state,this.gearTemplates);
   }
   prepare(root) {
@@ -65,16 +68,10 @@ export class GameActors {
       const owned = (Array.isArray(o.material) ? o.material : [o.material]).map(m => {
         const c = m.clone(); c.transparent = true; c.opacity = 1; c.depthWrite = true;
         if (enemy) c.color.lerp(new T.Color(enemy.color), enemy.elite ? .4 : .22);
-        const edge = enemy?.elite ? new T.Color(enemy.color).multiplyScalar(.65).toArray().join(',') : enemy ? '.035,.045,.065' : '.06,.15,.19';
-        c.onBeforeCompile=shader=>{
-          shader.uniforms.uWorldNight=this.night;shader.fragmentShader='uniform float uWorldNight;\n'+shader.fragmentShader;
-          shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',`
-            float silhouette=pow(1.-abs(dot(normalize(normal),normalize(vViewPosition))),3.);
-            outgoingLight=max(outgoingLight,diffuseColor.rgb*mix(${enemy?'.8':'1.35'},${enemy?'.24':'.52'},uWorldNight));
-            outgoingLight+=silhouette*vec3(${edge});
-            #include <opaque_fragment>`);
-        };
-        c.customProgramCacheKey=()=>enemy?.elite?`rpg-elite-${enemy.color}`:enemy?'rpg-enemy-cycle-fill':'rpg-hero-cycle-fill';
+        const rimTint=enemy?.elite?new T.Color(enemy.color).multiplyScalar(.65):enemy?new T.Color(.035,.045,.065):new T.Color(.06,.15,.19),fill=new T.Vector2(enemy ? .8 : 1.35,enemy ? .24 : .52);
+        c.onBeforeCompile=shader=>{shader.uniforms.uWorldNight=this.night;shader.uniforms.uActorRim={value:rimTint};shader.uniforms.uActorFill={value:fill};shader.fragmentShader='uniform float uWorldNight;uniform vec3 uActorRim;uniform vec2 uActorFill;\n'+shader.fragmentShader;
+          shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',`float silhouette=pow(clamp(1.-abs(dot(normalize(normal),normalize(vViewPosition))),0.,1.),3.);outgoingLight=max(outgoingLight,diffuseColor.rgb*mix(uActorFill.x,uActorFill.y,uWorldNight));outgoingLight+=silhouette*uActorRim;\n#include <opaque_fragment>`);
+        };c.customProgramCacheKey=()=>'rpg-character-cycle-v2';
         materials.push(c); return c;
       });
       o.material = Array.isArray(o.material) ? owned : owned[0];
@@ -129,7 +126,7 @@ export class GameActors {
     view.group.rotation.y+=turn*(1-Math.exp(-dt*(p.action==='attack'?35:18)));view.archerRig?.restore();view.mixer.update(dt);
     view.pivot.rotation.z = p.dash > 0 ? -.25 : T.MathUtils.damp(view.pivot.rotation.z, 0, 12, dt);
     view.archerRig?.update();
-    this.gearAppearance?.update();
+    this.gearAppearance?.update(dt);
     this.growthTint.set(this.state.growth.color);
     for(const m of this.weaponMaterials)if(m.emissive){m.emissive.copy(this.growthTint);m.emissiveIntensity=this.state.growth.tier*(p.action==='attack'?.3:.09);if(this.gearAppearance?.weaponStyle){const f=this.gearAppearance.weaponStyle;m.emissive.set(f.from).lerp(this.growthTint.set(f.to),f.mix);m.emissiveIntensity+=f.power*.32;}}
     for (const m of view.materials) if (m.emissive) m.emissive.setRGB(p.hurtFlash > 0 ? .16 : 0, 0, 0);
@@ -160,7 +157,7 @@ export class GameActors {
   }
   dispose() {
     this.nightEyes.dispose();this.gearAppearance?.dispose();
-    const views = [this.player, ...this.enemies.values()].filter(Boolean);
+    const views = [this.player,this.warmActor, ...this.enemies.values()].filter(Boolean);
     for (const v of views) this.release(v);
     this.weaponMaterials?.forEach(m=>m.dispose());
     for (const root of this.templates) root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } } });

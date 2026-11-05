@@ -1,3 +1,4 @@
+import { GameLootLabels } from './GameLootLabels.js';
 import * as T from 'three';
 import { BOONS, CLASSES, INTERACTABLES, ITEMS, SKILLS, ZONES, zoneAt, heightAt } from './GameData.js';
 import { itemIcon } from './GameIcons.js';
@@ -24,7 +25,7 @@ export class GameUI {
       <section class="skill-dock"><div class="basic-hint">${itemIcon(p.icon)}<span>鼠标左键<br><b>${p.primary}</b><small id="attack-form"></small><small id="fervor-count"></small><i id="fervor-progress" aria-hidden="true"></i></span></div><div class="skill-slots">${skillMarkup}<button class="skill-slot heal-slot" id="heal-button" title="恢复 45% 生命，冷却 18 秒" aria-label="治疗（C）">${itemIcon(4)}<i class="cooldown-mask"></i><strong class="cooldown-text"></strong><kbd>C</kbd><span class="skill-name">回春</span></button></div><div class="dodge-hint"><kbd>Space</kbd><span>闪避 · 35 耐力</span></div></section>
       <div class="xp-line"><i id="xp-fill"></i></div><div class="control-reminder"><span><kbd>W A S D</kbd> 移动</span><span>自动索敌 · 鼠标优先</span><span><kbd>F</kbd> 交互</span><span id="performance-readout"></span></div><div id="damage-layer"></div><div id="hurt-vignette"></div>
     `;
-    this.gearUI=new GameGearUI(this);
+    this.gearUI=new GameGearUI(this);this.lootLabels=new GameLootLabels(game);
     this.hp = document.querySelector('#hp-fill'); this.energy = document.querySelector('#energy-fill'); this.stamina = document.querySelector('#stamina-fill');
     this.skillButtons = [...document.querySelectorAll('[data-skill]')];
     this.skillButtons.forEach(b => b.onclick = () => game.cast(Number(b.dataset.skill)));
@@ -142,7 +143,7 @@ export class GameUI {
       const merged=this.numbers.find(n=>n.enemyId===event.enemyId&&n.elementType===event.element&&n.age<((event.element==='halo'||event.fervor)?.32:.16));const n = merged || this.numbers.find(n => n.age > 1.1) || this.numbers[0];const damage=(merged?n.damage:0)+event.damage;Object.assign(n, { age: merged?n.age:0, enemyId:event.enemyId,elementType:event.element,damage, x: event.x, z: event.z, height:heightAt(event.x,event.z)+1.8*event.scale }); n.element.textContent = Math.round(damage); n.element.className = 'damage-number' + (event.critical ? ' critical' : ''); n.element.hidden = false;
     }
     if (['toast','clear','seal','wave','ascend','fervorUpgrade','vitalityUpgrade','spiritUpgrade'].includes(event.type)) this.toast(event.text);
-    if(event.type==='gearLoot'){const e=document.querySelector('#loot-toast'),item=event.item;e.innerHTML=gearIcon(item.slot)+`<div><small style="color:${GEAR_RARITIES[item.rarity].color}">获得${GEAR_RARITIES[item.rarity].name}装备</small><strong>${gearName(item)}</strong><span>按 I 查看穿戴与强化</span></div>`;e.classList.add('visible');this.lootTimer=5;}
+    if(event.type==='gearLoot'){const e=document.querySelector('#loot-toast'),item=event.item;e.innerHTML=gearIcon(item)+`<div><small style="color:${GEAR_RARITIES[item.rarity].color}">获得${GEAR_RARITIES[item.rarity].name}装备</small><strong style="color:${GEAR_RARITIES[item.rarity].color}">${gearName(item)}</strong><span>按 I 查看穿戴与强化</span></div>`;e.classList.add('visible');this.lootTimer=5;}
     if (event.type === 'loot') { const item = ITEMS[event.id], e = document.querySelector('#loot-toast'); e.innerHTML = `${itemIcon(item.icon)}<div><small>获得${item.rarity}遗物</small><strong>${item.name}</strong><span>按 I 查看装备</span></div>`; e.classList.add('visible'); this.lootTimer = 5; }
     if (event.type === 'region') this.region(event.zone);
     if (event.type === 'camp') this.camp(); if (event.type === 'defeat') this.defeat();
@@ -154,6 +155,7 @@ export class GameUI {
   }
   drawMap(canvas = this.mapCanvas) { this.atlas.draw(canvas); }
   update(dt, fps, calls) {
+    this.lootLabels?.update(dt);
     const p = this.state.player, s = this.state.save, stats = this.state.stats; this.frame++;
     this.toastTimer -= dt; this.regionTimer -= dt; this.lootTimer = (this.lootTimer || 0) - dt; this.hurtTimer = (this.hurtTimer || 0) - dt;
     if (this.toastTimer <= 0) document.querySelector('#game-toast').classList.remove('visible'); if (this.regionTimer <= 0) document.querySelector('#region-toast').classList.remove('visible'); if (this.lootTimer <= 0) document.querySelector('#loot-toast').classList.remove('visible'); if (this.hurtTimer <= 0) document.querySelector('#hurt-vignette').classList.remove('active');

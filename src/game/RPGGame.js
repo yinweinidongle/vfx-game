@@ -1,3 +1,4 @@
+import { warmVFX } from './VFXWarmup.js';
 import './gear-ui.css';
 import * as T from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -50,8 +51,8 @@ export class RPGGame {
     this.navigation=new GameNavigation(this.state);
     this.guide=new GameRouteGuide(this.scene,this.state,this.navigation);this.guide.update(0);this.guide.group.visible=this.settings.route!==false;await this.guide.loadTexture(`${import.meta.env.BASE_URL}game/art/route-silk-v1.webp`);
     progress('编织技能与光影…');this.fx=new GameFX(this.scene,this.camera,this.state,this.actors);await this.fx.ready;
-    this.ui=new GameUI(this);this.awakeningView=new AwakeningPresentation(this);await Promise.all([this.awakeningView.ready,this.audio.loadAwakening(this.state.kind)]);this.cameraSnap=true;this.updateCamera(0);this.world.update(0,0);this.actors.update(0);this.fx.update(0);
-    await this.renderer.compileAsync(this.scene,this.camera);this.ready=true;this.paused=false;this.lastTime=performance.now();document.querySelector('#game-loading').hidden=true;
+    this.ui=new GameUI(this);this.awakeningView=new AwakeningPresentation(this);await Promise.all([this.awakeningView.ready,this.audio.loadAwakening(this.state.kind),this.audio.loot.load(`${import.meta.env.BASE_URL}game/audio/loot/treasure-chimes-v1.wav`)]);this.cameraSnap=true;this.updateCamera(0);this.world.update(0,0);this.actors.update(0);this.fx.update(0);
+    progress('准备战斗演出…');await warmVFX(this.renderer,this.scene,this.camera,[this.fx.group,this.fx.thunder.group,this.fx.ascendant.group,this.fx.loot.group,this.actors.warmActor.group]);this.ready=true;this.paused=false;this.lastTime=performance.now();document.querySelector('#game-loading').hidden=true;
     document.querySelector('#game-hud').hidden=false;this.save();
     if(this.state.pendingBoons)this.ui.boon();else if(this.state.save.playTime<1)this.ui.tutorial();
     return this;
@@ -93,6 +94,7 @@ export class RPGGame {
   }
   handleEvents() {
     const events=this.state.events.splice(0);
+    this.audio.loot.handle(events,this.state.player,this.camera);
     for(const e of events){
       if(e.type==='spawn')this.actors.spawn(e.enemy);
       if(e.type==='attack'||e.type==='cast')this.actors.attack(e.index>=2);
@@ -130,5 +132,5 @@ export class RPGGame {
   challenge() {
     const s=this.state.save;s.challenge++;s.won=false;s.seals=[false,false];s.cleared=[];s.opened=[];s.checkpoint='camp';this.save();window.location.href='game.html?continue=1';
   }
-  dispose() { this.save();cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.awakeningView?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
+  dispose() { this.save();cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.awakeningView?.dispose();this.ui?.lootLabels?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
 }

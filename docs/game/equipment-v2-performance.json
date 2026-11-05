@@ -1,0 +1,395 @@
+{
+  "machine": "Apple M5, macOS, Codex in-app Chromium",
+  "conditions": {
+    "cssViewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "quality": "high",
+    "enemies": 18,
+    "measurement": "7.6 seconds per cast, actual requestAnimationFrame intervals; first use of each skill; G H J R Q E in order",
+    "noProgressSaved": true
+  },
+  "baseline": [
+    {
+      "baseline": true,
+      "key": "G",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 903,
+      "p50": 8.3,
+      "p95": 9.9,
+      "p99": 10.3,
+      "max": 84.5,
+      "over33": 1,
+      "over100": 0,
+      "programsBefore": 118,
+      "programsPeak": 139,
+      "programsAfter": 139,
+      "maxDrawCalls": 322,
+      "maxTriangles": 3361224,
+      "cpuPerFrame": {
+        "fx": 0.05,
+        "actors": 0.35,
+        "render": 1.71,
+        "ui": 0.24
+      },
+      "longTasks": [
+        86
+      ]
+    },
+    {
+      "baseline": true,
+      "key": "H",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 898,
+      "p50": 8.3,
+      "p95": 10.3,
+      "p99": 10.4,
+      "max": 108.4,
+      "over33": 1,
+      "over100": 1,
+      "programsBefore": 139,
+      "programsPeak": 163,
+      "programsAfter": 163,
+      "maxDrawCalls": 396,
+      "maxTriangles": 3597376,
+      "cpuPerFrame": {
+        "fx": 0.03,
+        "actors": 0.31,
+        "render": 1.74,
+        "ui": 0.23
+      },
+      "longTasks": [
+        114
+      ]
+    },
+    {
+      "baseline": true,
+      "key": "J",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 710,
+      "p50": 8.3,
+      "p95": 10.3,
+      "p99": 10.4,
+      "max": 1609.9,
+      "over33": 2,
+      "over100": 1,
+      "programsBefore": 163,
+      "programsPeak": 180,
+      "programsAfter": 180,
+      "maxDrawCalls": 402,
+      "maxTriangles": 3578700,
+      "cpuPerFrame": {
+        "fx": 0.06,
+        "actors": 0.32,
+        "render": 3.95,
+        "ui": 0.24
+      },
+      "longTasks": [
+        1618,
+        56
+      ]
+    }
+  ],
+  "optimized": [
+    {
+      "baseline": false,
+      "key": "G",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 911,
+      "p50": 8.3,
+      "p95": 10.1,
+      "p99": 10.4,
+      "max": 18.2,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 155,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 330,
+      "maxTriangles": 3306339,
+      "cpuPerFrame": {
+        "fx": 0.06,
+        "actors": 0.4,
+        "render": 1.93,
+        "ui": 0.28
+      },
+      "longTasks": []
+    },
+    {
+      "baseline": false,
+      "key": "H",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 911,
+      "p50": 8.3,
+      "p95": 10.3,
+      "p99": 10.3,
+      "max": 17,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 156,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 311,
+      "maxTriangles": 3225526,
+      "cpuPerFrame": {
+        "fx": 0.04,
+        "actors": 0.36,
+        "render": 1.94,
+        "ui": 0.24
+      },
+      "longTasks": []
+    },
+    {
+      "baseline": false,
+      "key": "J",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 911,
+      "p50": 8.3,
+      "p95": 9.7,
+      "p99": 10.4,
+      "max": 16.7,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 156,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 403,
+      "maxTriangles": 3804717,
+      "cpuPerFrame": {
+        "fx": 0.06,
+        "actors": 0.38,
+        "render": 1.98,
+        "ui": 0.28
+      },
+      "longTasks": []
+    },
+    {
+      "baseline": false,
+      "key": "R",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 913,
+      "p50": 8.3,
+      "p95": 9.9,
+      "p99": 10.3,
+      "max": 10.4,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 156,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 363,
+      "maxTriangles": 3519935,
+      "cpuPerFrame": {
+        "fx": 0.27,
+        "actors": 0.37,
+        "render": 1.89,
+        "ui": 0.26
+      },
+      "longTasks": []
+    },
+    {
+      "baseline": false,
+      "key": "Q",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 913,
+      "p50": 8.3,
+      "p95": 9.3,
+      "p99": 10.3,
+      "max": 10.4,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 156,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 308,
+      "maxTriangles": 3419679,
+      "cpuPerFrame": {
+        "fx": 0.07,
+        "actors": 0.34,
+        "render": 1.83,
+        "ui": 0.22
+      },
+      "longTasks": []
+    },
+    {
+      "baseline": false,
+      "key": "E",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "enemies": 18,
+      "frames": 913,
+      "p50": 8.3,
+      "p95": 9.9,
+      "p99": 10.3,
+      "max": 10.4,
+      "over33": 0,
+      "over100": 0,
+      "programsBefore": 156,
+      "programsPeak": 156,
+      "programsAfter": 156,
+      "maxDrawCalls": 354,
+      "maxTriangles": 3537327,
+      "cpuPerFrame": {
+        "fx": 0.14,
+        "actors": 0.32,
+        "render": 1.88,
+        "ui": 0.24
+      },
+      "longTasks": []
+    }
+  ],
+  "retinaFinalBuild": {
+    "conditions": {
+      "cssViewport": [
+        1280,
+        720
+      ],
+      "renderBuffer": [
+        2240,
+        1260
+      ],
+      "dpr": 1.75,
+      "quality": "high",
+      "enemies": 18,
+      "measurement": "7.6 seconds per case. First use of G, H and J followed by 18 same-frame kills with six gear drops of each quality."
+    },
+    "samples": [
+      {
+        "baseline": false,
+        "key": "G",
+        "width": 1280,
+        "height": 720,
+        "dpr": 1.75,
+        "enemies": 18,
+        "frames": 686,
+        "p50": 8.4,
+        "p95": 16.8,
+        "p99": 18.3,
+        "max": 42,
+        "over33": 1,
+        "over100": 0,
+        "programsBefore": 161,
+        "programsPeak": 162,
+        "programsAfter": 162,
+        "maxDrawCalls": 332,
+        "maxTriangles": 3311331,
+        "cpuPerFrame": {
+          "fx": 0.08,
+          "actors": 0.45,
+          "render": 2.05,
+          "ui": 0.31
+        },
+        "longTasks": []
+      },
+      {
+        "baseline": false,
+        "key": "H",
+        "width": 1280,
+        "height": 720,
+        "dpr": 1.75,
+        "enemies": 18,
+        "frames": 664,
+        "p50": 8.4,
+        "p95": 16.8,
+        "p99": 18.1,
+        "max": 50.2,
+        "over33": 3,
+        "over100": 0,
+        "programsBefore": 162,
+        "programsPeak": 162,
+        "programsAfter": 162,
+        "maxDrawCalls": 316,
+        "maxTriangles": 3237410,
+        "cpuPerFrame": {
+          "fx": 0.06,
+          "actors": 0.44,
+          "render": 2.04,
+          "ui": 0.31
+        },
+        "longTasks": []
+      },
+      {
+        "baseline": false,
+        "key": "J",
+        "width": 1280,
+        "height": 720,
+        "dpr": 1.75,
+        "enemies": 18,
+        "frames": 616,
+        "p50": 10.2,
+        "p95": 18,
+        "p99": 18.7,
+        "max": 51,
+        "over33": 1,
+        "over100": 0,
+        "programsBefore": 162,
+        "programsPeak": 162,
+        "programsAfter": 162,
+        "maxDrawCalls": 408,
+        "maxTriangles": 3816605,
+        "cpuPerFrame": {
+          "fx": 0.1,
+          "actors": 0.48,
+          "render": 2.1,
+          "ui": 0.33
+        },
+        "longTasks": []
+      },
+      {
+        "baseline": false,
+        "key": "LOOT",
+        "width": 1280,
+        "height": 720,
+        "dpr": 1.75,
+        "enemies": 18,
+        "frames": 786,
+        "p50": 8.4,
+        "p95": 16.7,
+        "p99": 17.3,
+        "max": 25,
+        "over33": 0,
+        "over100": 0,
+        "programsBefore": 162,
+        "programsPeak": 163,
+        "programsAfter": 163,
+        "gearDrops": 18,
+        "maxDrawCalls": 325,
+        "maxTriangles": 3232704,
+        "cpuPerFrame": {
+          "fx": 0.07,
+          "actors": 0.09,
+          "render": 1.46,
+          "ui": 0.24
+        },
+        "longTasks": []
+      }
+    ]
+  }
+}

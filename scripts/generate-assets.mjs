@@ -11,7 +11,8 @@ const legacySpecs = [
   { name:'frost-bow-v2', image:'public/concepts/frost-bow-v2.png', seed:28418,
     prompt:'One complete elegant recurve bow matching the reference. Tall curved sapphire crystal limbs with sharp ice barbs and silver filigree structural inlays, usable narrow central grip, single thin taut string. Deep blue ice and white internal fractures, real thickness, refined PBR details. No arrow, particles, glow clouds, pedestal, character or background.' },
 ];
-const specs = process.argv.includes('--equipment') ? JSON.parse(await readFile(resolve(root,'asset-specs/equipment.json'),'utf8')) : process.argv.includes('--rpg-relic') ? [{
+const specIndex=process.argv.indexOf('--specs');
+const specs = specIndex>=0 ? JSON.parse(await readFile(resolve(root,process.argv[specIndex+1]),'utf8')) : process.argv.includes('--equipment') ? JSON.parse(await readFile(resolve(root,'asset-specs/equipment.json'),'utf8')) : process.argv.includes('--rpg-relic') ? [{
   name: 'celestial-shrine-v1', image: 'assets/rpg-source/art/celestial-shrine-reference.png',
   model: 'doubao-seed3d-2-0-260328', prompt: '',
   flags: '--subdivisionlevel high --fileformat glb',
@@ -47,10 +48,15 @@ async function readSecret(){
 let key=await readSecret();
 const redact=s=>String(s).replaceAll(key,'[REDACTED]');
 async function request(path='',body){
-  const response=await fetch(endpoint+path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(120000)});
-  const raw=await response.text(); let data;try{data=JSON.parse(raw);}catch{throw new Error(`HTTP ${response.status}: invalid JSON`);}
-  if(!response.ok)throw new Error(`HTTP ${response.status}: ${redact(JSON.stringify(data))}`);
-  return data;
+  // GET status polls are idempotent; task submissions are deliberately never retried blindly.
+  for(let attempt=0;attempt<5;attempt++){
+    try{
+      const response=await fetch(endpoint+path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(120000)});
+      if(!body&&[429,500,502,503,504].includes(response.status)&&attempt<4){await new Promise(r=>setTimeout(r,Math.min(15000,2000*2**attempt)));continue;}
+      const raw=await response.text();let data;try{data=JSON.parse(raw);}catch{throw new Error(`HTTP ${response.status}: invalid JSON`);}
+      if(!response.ok)throw new Error(`HTTP ${response.status}: ${redact(JSON.stringify(data))}`);return data;
+    }catch(error){if(body||attempt===4)throw error;await new Promise(r=>setTimeout(r,Math.min(15000,2000*2**attempt)));}
+  }
 }
 async function saveState(name,state){await writeFile(resolve(root,`.generation/${name}.json`),JSON.stringify(state,null,2));}
 const jobs=[];

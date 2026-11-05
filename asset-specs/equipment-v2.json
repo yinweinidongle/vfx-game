@@ -1,0 +1,66 @@
+[
+  {
+    "name": "equipment-wings-star-v2",
+    "asset": "wings-star",
+    "image": "assets/rpg-source/art/equipment/variants/wings-star-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-wings-phoenix-v2",
+    "asset": "wings-phoenix",
+    "image": "assets/rpg-source/art/equipment/variants/wings-phoenix-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-cloak-star-v2",
+    "asset": "cloak-star",
+    "image": "assets/rpg-source/art/equipment/variants/cloak-star-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-cloak-imperial-v2",
+    "asset": "cloak-imperial",
+    "image": "assets/rpg-source/art/equipment/variants/cloak-imperial-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-bow-star-v2",
+    "asset": "bow-star",
+    "image": "assets/rpg-source/art/equipment/variants/bow-star-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-bow-imperial-v2",
+    "asset": "bow-imperial",
+    "image": "assets/rpg-source/art/equipment/variants/bow-imperial-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-dao-imperial-v2",
+    "asset": "dao-imperial",
+    "image": "assets/rpg-source/art/equipment/variants/dao-imperial-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  },
+  {
+    "name": "equipment-jian-imperial-v2",
+    "asset": "jian-imperial",
+    "image": "assets/rpg-source/art/equipment/variants/jian-imperial-v2-seed3d.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb"
+  }
+]
