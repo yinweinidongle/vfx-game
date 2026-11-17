@@ -1,15 +1,21 @@
-// Times in seconds within the original six-cue mono sound bank.
+// Times in seconds within treasure-chimes-v2.wav.
 export const LOOT_SOUNDS = {
   gearDrop: [
     {offset: 0, length: .32, gain: .52},
     {offset: .40, length: .70, gain: .68},
     {offset: 1.20, length: 1.26, gain: .84},
+    {offset: 3.94, length: 1.83, gain: 1.08},
   ],
   gearLand: [
     {offset: 2.55, length: .19, gain: .26},
     {offset: 2.83, length: .35, gain: .34},
     {offset: 3.28, length: .55, gain: .43},
+    {offset: 5.87, length: .63, gain: .51},
   ],
+};
+export const FORGE_SOUNDS = {
+  success: {offset: 6.60, length: .80, gain: .88},
+  failure: {offset: 7.50, length: .58, gain: .72},
 };
 
 export class LootSound {
@@ -57,7 +63,7 @@ export class LootSound {
 
   play(event, range, player, camera) {
     const context = this.audio.context, now = context.currentTime;
-    const tier = Math.min(2, Math.max(0, Math.trunc(event.rarity) || 0));
+    const tier = Math.min(LOOT_SOUNDS.gearDrop.length - 1, Math.max(0, Math.trunc(event.rarity) || 0));
     const isDrop = event.type === 'gearDrop';
     const last = this.last[event.type], gap = isDrop ? .10 : .14;
     if (now - last.time < gap && tier <= last.tier) return;
@@ -76,7 +82,7 @@ export class LootSound {
     last.tier = tier;
     const cue = LOOT_SOUNDS[event.type][tier], attenuation = 1 / (1 + range * .035);
     if (!this.buffer) {
-      this.audio.tone([1046.5, 1318.5, 1568][tier], cue.length, .13 * attenuation, 'sine', isDrop ? 1.06 : .94);
+      this.audio.tone([1046.5, 1318.5, 1568, 783.99][tier], cue.length, .13 * attenuation, 'sine', isDrop ? 1.06 : .94);
       return;
     }
     const source = context.createBufferSource(), gain = context.createGain();
@@ -84,13 +90,14 @@ export class LootSound {
     gain.gain.value = cue.gain * attenuation;
     source.connect(gain);
     const pan = context.createStereoPanner?.();
+    const destination = this.audio.combat ?? this.audio.master;
     if (pan) {
       const axes = camera?.matrixWorld.elements;
       const side = axes ? (event.x - player.x) * axes[0] + (event.z - player.z) * axes[2] : 0;
       pan.pan.value = Math.max(-.68, Math.min(.68, side / 17));
-      gain.connect(pan).connect(this.audio.master);
+      gain.connect(pan).connect(destination);
     } else {
-      gain.connect(this.audio.master);
+      gain.connect(destination);
     }
     const voice = {source, gain, priority};
     this.voices.add(voice);
@@ -103,9 +110,42 @@ export class LootSound {
     source.start(now, cue.offset, cue.length);
   }
 
+  async forge(success) {
+    const context = this.audio.context;
+    if (!context || this.audio.disposed || context.state === 'closed') return;
+    const request = this.forgeRequest = (this.forgeRequest || 0) + 1;
+    try {
+      if (context.state !== 'running') await context.resume();
+    } catch { return; }
+    if (this.audio.disposed || request !== this.forgeRequest) return;
+    const previous = this.forgeVoice;
+    if (previous) {
+      previous.gain.gain.setTargetAtTime(0, context.currentTime, .007);
+      previous.source.stop(context.currentTime + .025);
+    }
+    if (!this.buffer) {
+      this.audio.tone(success ? 1318.5 : 196, .36, .24, 'triangle', success ? 1.33 : .69, this.audio.master);
+      return;
+    }
+    const cue = FORGE_SOUNDS[success ? 'success' : 'failure'];
+    const source = context.createBufferSource(), gain = context.createGain();
+    source.buffer = this.buffer;
+    gain.gain.value = cue.gain;
+    source.connect(gain).connect(this.audio.master);
+    const voice = this.forgeVoice = {source,gain};
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+      if (this.forgeVoice === voice) this.forgeVoice = null;
+    };
+    source.start(context.currentTime, cue.offset, cue.length);
+  }
+
   dispose() {
     for (const voice of this.voices) voice.source.stop();
     this.voices.clear();
+    this.forgeVoice?.source.stop();
+    this.forgeVoice = null;
     this.buffer = null;
   }
 }

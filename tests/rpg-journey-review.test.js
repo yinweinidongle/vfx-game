@@ -107,7 +107,7 @@ test('a regional bounty tracks accessible uncleared fights and pays once on the 
   assert.equal(s.objective().x,region.encounters[0].x);
   s.save.cleared.push('path','grove');const last=region.encounters[2];
   s.player.x=last.x;s.player.z=last.z+6;s.spawn(last);
-  const clear=()=>{for(const e of [...s.enemies])if(e.hp>0)s.hit(e,e.maxHp+1,'physical');};
+  const clear=()=>{for(const e of [...s.enemies])if(e.hp>0)s.hit(e,(e.maxHp+1)*(1+e.defense/100),'physical');};
   clear();s.encounters.update(2);clear();
   assert.equal(s.save.trackedChapter,0);assert.equal(bountyProgress(s.save,region).cleared,3);
   assert.equal(s.events.filter(e=>e.type==='toast'&&e.text.includes('清剿完成')).length,1);

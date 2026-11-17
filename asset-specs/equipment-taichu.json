@@ -1,0 +1,79 @@
+[
+  {
+    "name": "equipment-armor-taichu-v1",
+    "asset": "armor-taichu",
+    "title": "太初玄渊甲",
+    "image": "assets/rpg-source/art/equipment/taichu/armor-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/armor-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: Single wearable sleeveless torso cuirass for a slim adult xianxia fighter, symmetrical overlapping dark celadon-black jade shell plates across ribs and abdomen, scalloped silver-champagne edging, two tiny carved cloud shoulder flares attached close to the upper chest and a high centered tessellated teal heartstone. Leave open armholes, neckline and bottom with an obvious hollow shell. Front-facing three-quarter view only 15 degrees off front. Compact upper torso only, no trousers, sleeves or helmet."
+  },
+  {
+    "name": "equipment-boots-taichu-v1",
+    "asset": "boots-taichu",
+    "title": "太初踏虚靴",
+    "image": "assets/rpg-source/art/equipment/taichu/boots-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/boots-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One single left ankle boot for a slim humanoid fighter, foot points to the right, upright ankle stem, fitted black fabric and sculpted dark teal jade toe cap with muted champagne-metal filigree and an inset oval sea-green anklet. Distinct full flat sole, slim ankle and upper opening, low ankle height for fitting on an animated foot. Orthographic side-three-quarter view. Only one complete boot."
+  },
+  {
+    "name": "equipment-wings-taichu-v1",
+    "asset": "wings-taichu",
+    "title": "太初玄翎天翼",
+    "image": "assets/rpg-source/art/equipment/taichu/wings-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/wings-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One complete symmetrical pair of arched wearable celestial crane wings joined by a small stern concave back harness. Horizontal span, front-on orthographic, both full outstretched silhouettes, mirrored shoulder hinges and tightly rooted layered black-jade feather vanes. Wingtips sweep upward. Thin pale champagne edging and translucent teal jade inlay held physically inside the feathers. Nested feather silhouette clearly legible at thumbnail size. Exactly two wing limbs, centered harness."
+  },
+  {
+    "name": "equipment-cloak-taichu-v1",
+    "asset": "cloak-taichu",
+    "title": "太初海渊法衣",
+    "image": "assets/rpg-source/art/equipment/taichu/cloak-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/cloak-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One empty wearable ankle-length xianxia mantle without hood, viewed directly from behind. Flat isolated broad cloth silhouette, narrow soft folded neck collar with two strap loops attached, tapered fitted shoulders and a wide swept but nearly symmetric layered hem. Ink-black satin silk and deep petrol-teal gradient, carved sea-green embroidery with subtle muted gold brocade at edges and referenceable engraved cloud motifs. Fine fabric grain, three readable large panel folds. Closed back and open front, no mannequin, no jacket or sleeves."
+  },
+  {
+    "name": "equipment-dao-taichu-v1",
+    "asset": "dao-taichu",
+    "title": "太初玄鲸天刀",
+    "image": "assets/rpg-source/art/equipment/taichu/dao-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/dao-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One single fully assembled sky-forged xianxia dao, vertical in frame with blade tip straight up and hilt down. Wide slightly concave single cutting edge, distinct asymmetric broad angular silhouette like a stylized whale fin, dark petrol jade enamel and reflective steel cutting edge, champagne-silver relief of turbulent clouds on the spine, luminous-looking teal core gem integrated in compact guard, dark cord handle long enough to grip. Perfectly straight camera-facing artwork, slight thickness readable. Full tip and pommel."
+  },
+  {
+    "name": "equipment-jian-taichu-v1",
+    "asset": "jian-taichu",
+    "title": "太初照渊仙剑",
+    "image": "assets/rpg-source/art/equipment/taichu/jian-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/jian-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One single fully assembled premium xianxia jian sword, vertical point up and pommel down, thin perfectly straight symmetric double-edged taper, engraved deep green-blue jade fuller within silver-black steel edges, an elegant symmetrical birdwing guard in antique champagne silver with one cool sea-green faceted center stone, dark narrow wrapped handle and petite pointed pommel. One grounded product render with full blade, no attached ribbons, clearly recognizable silhouette."
+  },
+  {
+    "name": "equipment-bow-taichu-v1",
+    "asset": "bow-taichu",
+    "title": "太初归潮神弓",
+    "image": "assets/rpg-source/art/equipment/taichu/bow-taichu-seed3d.png",
+    "concept": "assets/rpg-source/art/equipment/taichu/bow-taichu-concept.png",
+    "model": "doubao-seed3d-2-0-260328",
+    "prompt": "",
+    "flags": "--subdivisionlevel high --fileformat glb",
+    "conceptPrompt": "Use case: stylized-concept. Asset type: production game equipment concept for an inventory icon and image-to-3D PBR reconstruction, highest rarity Taichu in a Chinese fantasy ARPG. Neutral studio lighting, clean sharp edges, luxurious close-grain surface detail, bold readable shape. Palette: oxidized ink-dark teal jade #153d42, sea-glass green mineral accents #67d8bf, hairline champagne silver metal inlay. One centered object with generous clear margins on genuinely transparent background. Isolated complete object, no cast shadow, floating components, scenery, text, emitting light, particles, magic overlays or extra views.\nSubject: One single fully assembled vertical xianxia recurve bow, side-on orthographic, outer upper and lower limbs shaped like mirrored tidal waves of sculpted dark teal jade with smoky green crystal inserts. Elegant champagne-silver filigree on the limbs and visibly narrow textured central palm grip. Exactly one fine taut straight bowstring joins both recurved tips, to the left of the grip. Open recognizable bow silhouette, all parts physically attached, entire bow visible, no nocked arrow."
+  }
+]

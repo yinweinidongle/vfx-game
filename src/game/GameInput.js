@@ -4,6 +4,11 @@ export class GameInput {
     this.mouse = { x: 0, y: 0 }; this.pointerKnown = false; this.abort = new AbortController(); const opts = { signal: this.abort.signal };
     window.addEventListener('keydown', e => {
       if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (game.lootReveal?.active && !game.paused) {
+        e.preventDefault();
+        if (e.code === 'Escape') game.lootReveal.skip();
+        return;
+      }
       if (e.code === 'Escape') { if (!game.ready || !game.ui || game.saveBlocked) return; if (!game.ui.dialog.open) { e.preventDefault(); game.ui.pause(); } return; }
       if (game.paused || !game.ready) return;
       if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
@@ -19,7 +24,7 @@ export class GameInput {
     }, opts);
     window.addEventListener('keyup', e => this.keys.delete(e.code), opts); window.addEventListener('blur', () => this.clear(), opts);
     canvas.addEventListener('pointermove', e => this.position(e), opts);
-    canvas.addEventListener('pointerdown', e => { this.position(e); game.audio.start(); if (game.paused||!game.ready) return; if (e.button === 0) this.attacking = true; if (e.button === 2) { game.updateAim();const p=game.state.player;this.path=game.navigation.find(p.x,p.z,game.aim.x,game.aim.z);this.pathIndex=0;this.clickTarget=this.path?.[0]||null;if(!this.path)game.ui.toast('此处暂时无法到达，试着沿石路前进。'); } }, opts);
+    canvas.addEventListener('pointerdown', e => { this.position(e); if(game.lootReveal?.active)return;game.audio.start(); if (game.paused||!game.ready) return; if (e.button === 0) this.attacking = true; if (e.button === 2) { game.updateAim();const p=game.state.player;this.path=game.navigation.find(p.x,p.z,game.aim.x,game.aim.z);this.pathIndex=0;this.clickTarget=this.path?.[0]||null;if(!this.path)game.ui.toast('此处暂时无法到达，试着沿石路前进。'); } }, opts);
     window.addEventListener('pointerup', e => { if (e.button === 0) this.attacking = false; }, opts);
     canvas.addEventListener('contextmenu', e => e.preventDefault(), opts);
     canvas.addEventListener('wheel', e => { e.preventDefault(); game.skillCamera.cancel();game.zoom = Math.max(14,Math.min(28,game.zoom+e.deltaY*.015)); }, { ...opts, passive: false });

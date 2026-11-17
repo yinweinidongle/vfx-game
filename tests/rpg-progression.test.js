@@ -37,8 +37,9 @@ test('clearing an opening wave does not unlock its seal; last wave clears exactl
   s.nearby={type:'seal',seal:0,encounter:'frostkeeper'};s.save.seals[0]=false;s.interact();assert.equal(s.save.seals[0],false);s.save.seals[0]=true;
   tick(s,1.3);assert.equal(s.enemies.filter(e=>e.hp>0).length,0);
   tick(s,.25);assert.equal(s.enemies.filter(e=>e.hp>0).length,4);
-  killWave(s);assert.equal(s.save.cleared.filter(x=>x==='frostkeeper').length,1);const gold=s.save.gold;
-  tick(s,2);assert.equal(s.save.gold,gold);assert.equal(s.enemies.length,7);
+  killWave(s);assert.equal(s.save.cleared.filter(x=>x==='frostkeeper').length,1);const stoneTotal=()=>s.drops.filter(d=>d.alive&&d.stones).reduce((total,d)=>total+d.stones,0);
+  const gold=s.save.gold+stoneTotal();
+  tick(s,2);assert.equal(s.save.gold+stoneTotal(),gold);assert.equal(s.enemies.length,7);
   const restored=readSave({getItem:()=>JSON.stringify(s.save)}),next=new GameState('ice',restored);next.spawn(ENCOUNTERS[2]);assert.equal(next.enemies.length,0);
 });
 

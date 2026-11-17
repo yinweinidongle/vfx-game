@@ -58,5 +58,33 @@
   "jian-imperial": {
     "sourceTriangles": 7000,
     "triangles": 650
+  },
+  "armor-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 650
+  },
+  "boots-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 650
+  },
+  "wings-taichu": {
+    "sourceTriangles": 7998,
+    "triangles": 650
+  },
+  "cloak-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 644
+  },
+  "dao-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 649
+  },
+  "jian-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 650
+  },
+  "bow-taichu": {
+    "sourceTriangles": 7000,
+    "triangles": 649
   }
 }

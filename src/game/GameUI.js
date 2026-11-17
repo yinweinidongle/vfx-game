@@ -1,3 +1,4 @@
+import {experienceToNext} from './Progression.js';
 import {REGIONS, bountyProgress} from './RegionBounties.js';
 import { GameLootLabels } from './GameLootLabels.js';
 import * as T from 'three';
@@ -8,8 +9,8 @@ import { swordEvolution } from './SwordEvolution.js';
 import { MAX_FERVOR } from './AttackGrowth.js';
 import { vitalityGrowth, spiritGrowth } from './CultivationGrowth.js';
 import { awakeningStyle } from './AwakeningConfig.js';
-import { GameGearUI,gearIcon } from './GameGearUI.js';
-import { gearName,GEAR_RARITIES } from './GearData.js';
+import { GameGearUI,gearIcon,gearNameMarkup } from './GameGearUI.js';
+import { GEAR_RARITIES } from './GearData.js';
 export class GameUI {
   constructor(game) {
     this.game = game; this.state = game.state; this.frame = 0; this.toastTimer = 0; this.regionTimer = 0; this.lastObjective = ''; this.lastHP = -1;
@@ -17,7 +18,7 @@ export class GameUI {
     const p = CLASSES[this.state.kind];
     const skillMarkup=SKILLS.map((s,i)=>{const awakening=i>=3,name=awakening?awakeningStyle(this.state.kind,i).name:s.name;return `<button class="skill-slot ${awakening?`awakening-slot awakening-${i}`:''}" data-skill="${i}" title="${name} · 消耗 ${s.cost} 灵力 · ${s.description}" aria-label="${name}（${s.key}）">${awakening?'<span class="awakening-icon" aria-hidden="true"></span>':itemIcon(s.icon)}<i class="cooldown-mask"></i><strong class="cooldown-text"></strong><kbd>${s.key}</kbd><span class="skill-name">${name}</span><small class="mana-cost">${s.cost}</small></button>`;}).join('');
     document.querySelector('#game-hud').innerHTML = `
-      <section class="hero-status"><div class="hero-medallion">${itemIcon(p.icon)}<b id="hero-level">1</b></div><div class="hero-vitals"><div class="hero-name"><strong>${p.name}</strong><span id="hero-gold">0 灵石</span></div><div class="hp-track"><i id="hp-fill"></i><span id="hp-label"></span></div><div id="shield-status" hidden><div class="shield-track"><i id="shield-fill"></i></div><small id="shield-label"></small></div><div class="energy-track"><i id="energy-fill"></i></div><small id="energy-label"></small><div class="stamina-track"><i id="stamina-fill"></i></div></div></section>
+      <section class="hero-status"><div class="hero-medallion">${itemIcon(p.icon)}<b id="hero-level">1</b></div><div class="hero-vitals"><div class="hero-name"><strong>${p.name}</strong><span class="wallet-readout"><span id="hero-gold">0 灵石</span><b id="stone-gain" hidden></b></span></div><div class="hp-track"><i id="hp-fill"></i><span id="hp-label"></span></div><div id="shield-status" hidden><div class="shield-track"><i id="shield-fill"></i></div><small id="shield-label"></small></div><div class="energy-track"><i id="energy-fill"></i></div><small id="energy-label"></small><div class="stamina-track"><i id="stamina-fill"></i></div></div></section>
       <section class="quest-card"><span class="kicker">当前旅程</span><h2 id="quest-title"></h2><p id="quest-text"></p><div class="quest-route"><span id="quest-distance"></span><button id="route-toggle" title="切换路线提示（V）">引路 <kbd>V</kbd></button></div><div id="encounter-status" hidden><span></span><small></small></div></section>
       <section class="map-corner"><div class="map-caption"><span id="map-region">听雪林地</span><button id="map-open" title="展开地图（M）" aria-label="展开地图">总览 <kbd>M</kbd></button></div><div id="world-cycle" class="world-cycle"><i aria-hidden="true"></i><span></span><small></small></div><canvas id="minimap" width="440" height="368" aria-label="区域地图"></canvas><div class="world-actions"><button id="inventory-button">行囊 <kbd>I</kbd></button><button id="shop-button">商会 <kbd>B</kbd></button><button id="pause-button" aria-label="暂停游戏">暂停 <kbd>Esc</kbd></button></div></section>
       <section class="boss-status" hidden><span>失落的守门者</span><h2>归墟之主 · 无相</h2><div><i id="boss-fill"></i></div><p id="boss-phase">第一式 · 守界</p></section>
@@ -27,6 +28,7 @@ export class GameUI {
       <div class="xp-line"><i id="xp-fill"></i></div><div class="control-reminder"><span><kbd>W A S D</kbd> 移动</span><span>自动索敌 · 鼠标优先</span><span><kbd>F</kbd> 交互</span><span id="performance-readout"></span></div><div id="damage-layer"></div><div id="hurt-vignette"></div>
     `;
     this.gearUI=new GameGearUI(this);this.lootLabels=new GameLootLabels(game);
+    this.stoneGain=document.querySelector('#stone-gain');
     this.hp = document.querySelector('#hp-fill'); this.energy = document.querySelector('#energy-fill'); this.stamina = document.querySelector('#stamina-fill');
     this.skillButtons = [...document.querySelectorAll('[data-skill]')];
     this.skillButtons.forEach(b => b.onclick = () => game.cast(Number(b.dataset.skill)));
@@ -48,13 +50,15 @@ export class GameUI {
   }
   open(html, className = '') {
     this.awaitingRelease ||= this.game.input.attacking;
-    this.game.paused = true; this.game.input.clear();this.game.audio.pause(); this.dialog.className = className;
+    this.game.paused = true; this.game.input.clear();
+    if (!this.dialog.open) this.game.audio.pause();
+    this.dialog.className = className;
     this.dialog.innerHTML = `<button class="dialog-close" aria-label="关闭">×</button>${html}`;
     this.dialog.querySelector('.dialog-close').onclick = () => this.close(); if (!this.dialog.open) this.dialog.showModal();
   }
   close() {
     if (this.state.dead || this.game.storage?.conflict || this.game.saveBlocked) return;
-    if (!this.state.awakening.active) {
+    if (!this.state.awakening.active && !this.game.lootReveal?.active) {
       if (this.deferredVictory) { this.deferredVictory=false; this.victory(); return; }
       if (this.state.pendingBoons > 0) { this.boon(); return; }
     }
@@ -73,11 +77,11 @@ export class GameUI {
     this.dialog.querySelector('#volume-setting').oninput = e => this.game.configure({ volume: Number(e.target.value) }); this.dialog.querySelector('#shake-setting').onchange = e => this.game.configure({ shake: e.target.checked }); this.dialog.querySelector('#camera-setting').onchange=e=>this.game.configure({skillCamera:e.target.checked});this.dialog.querySelector('#route-setting').onchange=e=>this.game.configure({route:e.target.checked});this.dialog.querySelector('#music-setting').onchange=e=>this.game.configure({musicMuted:!e.target.checked});this.dialog.querySelector('#settings-done').onclick = () => this.close();
   }
   tutorial() {
-    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、提升三道修行。M 查看地图，可追踪区域清剿悬赏。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
+    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、继承太初强化或提升修行。M 查看地图，可追踪区域清剿悬赏。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
     this.dialog.querySelector('#tutorial-done').onclick = () => this.close();
   }
-  inventory(){this.gearUI.inventory();}
-  shop(){this.gearUI.shop();}
+  inventory(){if(!this.game.lootReveal?.active)this.gearUI.inventory();}
+  shop(){if(!this.game.lootReveal?.active)this.gearUI.shop();}
   relicInventory() {
     const s = this.state.save, stats = this.state.stats;
     const comparison=id=>{
@@ -90,6 +94,7 @@ export class GameUI {
     this.dialog.querySelectorAll('[data-item]').forEach(b => b.onclick = () => { this.state.equip(b.dataset.item); this.game.save(); this.inventory(); });
   }
   map() {
+    if(this.game.lootReveal?.active)return;
     const save = this.state.save;
     const regions = REGIONS.map(region => {
       const b = bountyProgress(save, region), tracked = save.trackedChapter === region.chapter;
@@ -157,17 +162,23 @@ export class GameUI {
       return;
     }
     if(event.type==='awakeningUnlocked')this.toast(event.text);
-        if(event.type==='awakeningEnd'){
+    if(event.type==='awakeningEnd' && !(this.lootRevealTime>0)){
       if(this.deferredVictory){this.deferredVictory=false;this.deferredBoon=false;this.victory();}
       else if(this.deferredBoon){this.deferredBoon=false;if(this.state.pendingBoons)this.boon();}
+    }
+    if (event.type === 'stonePickup') {
+      this.stoneTotal = (this.stoneTimer > 0 ? this.stoneTotal : 0) + event.amount;
+      this.stoneTimer = 1.5;
+      this.stoneGain.textContent = '+' + this.stoneTotal.toLocaleString();
+      this.stoneGain.hidden = false;
     }
     if(event.type==='dayNight')this.toast(event.text);
     if(event.type==='cast')this.regionTimer=0;
     if (event.type === 'hit') {
       const merged=this.numbers.find(n=>n.enemyId===event.enemyId&&n.elementType===event.element&&n.age<((event.element==='halo'||event.fervor)?.32:.16));const n = merged || this.numbers.find(n => n.age > 1.1) || this.numbers[0];const damage=(merged?n.damage:0)+event.damage;Object.assign(n, { age: merged?n.age:0, enemyId:event.enemyId,elementType:event.element,damage, x: event.x, z: event.z, height:heightAt(event.x,event.z)+1.8*event.scale }); n.element.textContent = Math.round(damage); n.element.className = 'damage-number' + (event.critical ? ' critical' : ''); n.element.hidden = false;
     }
-    if (['toast','clear','seal','wave','ascend','fervorUpgrade','vitalityUpgrade','spiritUpgrade'].includes(event.type)) this.toast(event.text);
-    if(event.type==='gearLoot'){const e=document.querySelector('#loot-toast'),item=event.item;e.innerHTML=gearIcon(item)+`<div><small style="color:${GEAR_RARITIES[item.rarity].color}">获得${GEAR_RARITIES[item.rarity].name}装备</small><strong style="color:${GEAR_RARITIES[item.rarity].color}">${gearName(item)}</strong><span>按 I 查看穿戴与强化</span></div>`;e.classList.add('visible');this.lootTimer=5;}
+    if (['toast','clear','seal','wave','ascend','fervorUpgrade','vitalityUpgrade','spiritUpgrade','taichuSet'].includes(event.type)) this.toast(event.text);
+    if(event.type==='gearLoot'){const e=document.querySelector('#loot-toast'),item=event.item;e.innerHTML=gearIcon(item)+`<div><small style="color:${GEAR_RARITIES[item.rarity].color}">获得${GEAR_RARITIES[item.rarity].name}装备</small><strong style="color:${GEAR_RARITIES[item.rarity].color}">${gearNameMarkup(item)}</strong><span>按 I 查看穿戴与强化</span></div>`;e.classList.add('visible');this.lootTimer=5;}
     if (event.type === 'loot') { const item = ITEMS[event.id], e = document.querySelector('#loot-toast'); e.innerHTML = `${itemIcon(item.icon)}<div><small>获得${item.rarity}遗物</small><strong>${item.name}</strong><span>按 I 查看装备</span></div>`; e.classList.add('visible'); this.lootTimer = 5; }
     if (event.type === 'region') this.region(event.zone);
     if (event.type === 'camp') this.camp(); if (event.type === 'defeat') this.defeat();
@@ -187,14 +198,19 @@ export class GameUI {
       }
     }
     this.lootLabels?.update(dt);
+    if(this.stoneTimer>0 && (this.stoneTimer-=dt)<=0) this.stoneGain.hidden=true;
     const p = this.state.player, s = this.state.save, stats = this.state.stats; this.frame++;
     this.toastTimer -= dt; this.regionTimer -= dt; this.lootTimer = (this.lootTimer || 0) - dt; this.hurtTimer = (this.hurtTimer || 0) - dt;
     if (this.toastTimer <= 0) document.querySelector('#game-toast').classList.remove('visible'); if (this.regionTimer <= 0) document.querySelector('#region-toast').classList.remove('visible'); if (this.lootTimer <= 0) document.querySelector('#loot-toast').classList.remove('visible'); if (this.hurtTimer <= 0) document.querySelector('#hurt-vignette').classList.remove('active');
     this.hp.style.width = `${p.hp / stats.hp * 100}%`; this.energy.style.width = `${p.energy/stats.energyMax*100}%`; this.stamina.style.width = `${p.stamina}%`;
     if (this.frame % 6 === 0) {
       const ward=document.querySelector('#shield-status');ward.hidden=this.state.vitality.level===0;document.querySelector('#shield-fill').style.background=this.state.vitality.color;document.querySelector('#shield-fill').style.width=`${this.state.vitality.capacity?p.shield/this.state.vitality.capacity*100:0}%`;document.querySelector('#shield-label').textContent=`长生 ${this.state.vitality.level} · 护罩 ${Math.ceil(p.shield)} / ${this.state.vitality.capacity}${p.shieldDelay>0?' · '+Math.ceil(p.shieldDelay)+'s':''}`;document.querySelector('#energy-label').textContent=`灵力 ${Math.floor(p.energy)} / ${stats.energyMax} · 灵息 ${this.state.spirit.level}`;
-      document.querySelector('#hp-label').textContent = `${Math.ceil(p.hp)} / ${stats.hp}`; document.querySelector('#hero-level').textContent = s.level; document.querySelector('#hero-gold').textContent = `${s.gold} 灵石`;
-      document.querySelector('#xp-fill').style.width = `${s.xp / (s.level * 95) * 100}%`;
+      document.querySelector('#hp-label').textContent = `${Math.ceil(p.hp)} / ${stats.hp}`;
+      const level = document.querySelector('#hero-level'), next = experienceToNext(s.level);
+      level.textContent = s.level;
+      level.title = `Lv.${s.level} · 历练 ${s.xp.toLocaleString()} / ${next.toLocaleString()}`;
+      document.querySelector('#hero-gold').textContent = `${s.gold.toLocaleString()} 灵石`;
+      document.querySelector('#xp-fill').style.width = `${Math.min(100, s.xp / next * 100)}%`;
       const o = this.state.objective(); document.querySelector('#quest-title').textContent = o.title; document.querySelector('#quest-text').textContent = o.text; document.querySelector('#quest-distance').textContent = `${Math.round(this.game.guide?.distance||Math.hypot(p.x-o.x,p.z-o.z))} m · ${this.game.settings.route!==false?'沿光带前进':'路线已隐藏'}`;
       const prompt = document.querySelector('#interact-prompt'); prompt.hidden = !this.state.nearby; if (this.state.nearby) prompt.querySelector('span').textContent = this.state.nearby.name;
       const cycle=this.state.cycle,cycleHUD=document.querySelector('#world-cycle');cycleHUD.classList.toggle('is-night',cycle.enraged);cycleHUD.querySelector('span').textContent=cycle.name+' '+String(Math.floor(cycle.hour)).padStart(2,'0')+':'+String(Math.floor(cycle.hour%1*60)).padStart(2,'0');cycleHUD.querySelector('small').textContent=cycle.enraged?'赤目 · 狂暴':'昼夜流转';cycleHUD.title='一昼夜约 6 分钟；夜间敌人伤害 +30%、追击速度 +22%、攻击恢复加快。';
@@ -202,7 +218,7 @@ export class GameUI {
       const g=this.state.growth;const form=document.querySelector('#attack-form');form.textContent=`${this.state.kind==='sword'?swordEvolution(g.stacks).name:g.name} · ${g.shots} 重追击`;form.style.color=`${g.color}`;document.querySelector('#fervor-count').textContent=`锋芒 ${g.stacks} 层 · ${g.echoes} 枚${g.spiritName}`;document.querySelector('#fervor-progress').style.setProperty('--fill',`${g.stacks===MAX_FERVOR?100:g.stacks%5*20}%`);document.querySelector('#route-toggle').setAttribute('aria-pressed',String(this.game.settings.route!==false));const shot=document.querySelector('#skill-shot');shot.hidden=!this.game.skillCamera.label;document.querySelector('#skill-shot-label').textContent=this.game.skillCamera.label;document.querySelector('#target-status').textContent=this.state.lockedTarget?`锁定 · ${this.state.lockedTarget.name}`:'';
       document.querySelector('#performance-readout').textContent = `${Math.round(fps)} FPS`;
       const battle=this.state.encounters.status(),battleHUD=document.querySelector('#encounter-status');battleHUD.hidden=!battle;
-      if(battle){const alive=this.state.enemies.filter(e=>e.encounter===battle.encounter.id&&e.hp>0);battleHUD.querySelector('span').textContent=`${battle.encounter.name} · 第 ${Math.max(1,battle.wave+1)} / ${battle.waves.length} 波`;battleHUD.querySelector('small').textContent=`敌境 Lv.${battle.encounter.level+s.challenge*2} · ${alive.length} 敌人${alive.some(e=>e.elite)?' · 精英 '+alive.filter(e=>e.elite).length:''}${battle.nextIn>=0?' · 援军将至':''}`;}
+      if(battle){battleHUD.title=`第 ${s.challenge+1} 轮 · 基础防御 ${Math.round(battle.profile.defense)}`;const alive=this.state.enemies.filter(e=>e.encounter===battle.encounter.id&&e.hp>0);battleHUD.querySelector('span').textContent=`${battle.encounter.name} · 第 ${Math.max(1,battle.wave+1)} / ${battle.waves.length} 波`;battleHUD.querySelector('small').textContent=`敌境 Lv.${battle.profile.level} · ${alive.length} 敌人${alive.some(e=>e.elite)?' · 精英 '+alive.filter(e=>e.elite).length:''}${battle.nextIn>=0?' · 援军将至':''}`;}
       [...this.skillButtons, document.querySelector('#heal-button')].forEach((b,i) => {
         const skill=SKILLS[i],time=skill?p.cooldowns[i]:p.potion,duration=skill?skill.cooldown*(1-stats.haste):18,locked=skill?.unlockLevel>s.level;
         const hasTarget=i>=3?this.state.enemies.some(e=>e.hp>0&&e.state!=='return'&&(e.spawnGrace||0)<=0&&Math.hypot(e.x-p.x,e.z-p.z)<=32):!!this.state.lockedTarget;

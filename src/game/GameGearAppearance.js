@@ -5,12 +5,21 @@ import { equipmentProfile,VARIANT_IDS,equipmentModelPath } from './EquipmentCata
 import { GearDynamics } from './GearDynamics.js';
 import { dressMaterial } from './GearMaterial.js';
 
+function forgeEnergy(time) {
+ return {tint:{value:new T.Color()},power:{value:0},rank:{value:0},width:{value:.10},taichu:{value:0},time};
+}
+
 /** Real equipment follows animated bones. Cloth and feathers use inertial control points on the GPU. */
 export class GameGearAppearance{
  constructor(view,state,templates){
   this.view=view;this.state=state;this.templates=templates;this.parts=[];this.cache=new Map();this.drapeCache=new Map();this.revision=-1;this.time={value:0};this.lastTime=state.time;this.dynamics=new GearDynamics();this.inverse=new T.Matrix4();this.delta=new T.Matrix4();this.bindings={};this.tint=new T.Color();
   view.group.updateMatrixWorld(true);this.inverse.copy(view.pivot.matrixWorld).invert();
   for(const name of ['Spine2','Spine1','Hips','LeftArm','RightArm','LeftFoot','RightFoot','RightHand']){const bone=view.model.getObjectByName('mixamorig'+name);if(!bone)continue;const bind=new T.Matrix4().multiplyMatrices(this.inverse,bone.matrixWorld);this.bindings[name]={bone,worldInverse:bone.matrixWorld.clone().invert(),bindInverse:bind.clone().invert(),position:new T.Vector3().setFromMatrixPosition(bind)};}
+  this.bowEnergy=forgeEnergy(this.time);
+  this.bowMaterials=[];
+  view.archerRig?.baseModel.traverse(mesh=>{
+   if (mesh.isMesh) this.bowMaterials.push(...dressMaterial(mesh,'weapon',this.bowEnergy,this.dynamics,null));
+  });
  }
  static async load(){
   const loader=new GLTFLoader(),templates={};
@@ -43,7 +52,7 @@ export class GameGearAppearance{
   const at=binding.position.clone().add(new T.Vector3(offset[0],offset[1],attachmentZ)),rest=new T.Matrix4().makeTranslation(at.x,at.y,at.z);
   if(slot==='weapon'&&boneName==='RightHand'){const local=new T.Matrix4().compose(new T.Vector3(.35,7.3,2.45),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),-Math.PI/2),new T.Vector3().setScalar(1/this.view.sourceScale));rest.copy(binding.bindInverse).invert().multiply(local);fit.position.y=dimensions[1]*.32;}
   carrier.matrixAutoUpdate=false;carrier.matrix.copy(rest);this.view.pivot.add(carrier);
-  const energy={tint:{value:new T.Color()},power:{value:0},rank:{value:0},time:this.time},materials=[];
+  const energy=forgeEnergy(this.time),materials=[];
   root.traverse(o=>{if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;o.frustumCulled=false;let drape=null;if(slot==='cloak'||slot==='wings'){
    const cached=this.drapeGeometry(o,matrices.get(o),box);o.geometry=cached.geo;
    // Inertia bends a garment in proportion to its length, not its very thin depth.
@@ -54,7 +63,7 @@ export class GameGearAppearance{
  addBow(profile){
   if(!this.view.archerRig||profile.id==='bow-base')return;
   const key='weapon:'+profile.id;let part=this.cache.get(key);
-  if(!part){const source=this.templates[profile.id];if(!source)throw new Error('Missing bow model: '+profile.id);const carrier=source.clone(true),energy={tint:{value:new T.Color()},power:{value:0},rank:{value:0},time:this.time},materials=[];carrier.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;materials.push(...dressMaterial(o,'weapon',energy,this.dynamics,null));}});part={slot:'weapon',profile,carrier,energy,materials,skinned:[],bow:true};this.cache.set(key,part);}
+  if(!part){const source=this.templates[profile.id];if(!source)throw new Error('Missing bow model: '+profile.id);const carrier=source.clone(true),energy=forgeEnergy(this.time),materials=[];carrier.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;materials.push(...dressMaterial(o,'weapon',energy,this.dynamics,null));}});part={slot:'weapon',profile,carrier,energy,materials,skinned:[],bow:true};this.cache.set(key,part);}
   this.view.archerRig.installEquipment(part.carrier,profile.tier);this.parts.push(part);
  }
   skinArmor(part){
@@ -78,21 +87,36 @@ export class GameGearAppearance{
   const kind=this.state.kind,item=slot=>this.state.gear.find(this.state.save.gearEquipped[slot]);
   if(item('armor'))this.add('armor','Spine2',[.74,.69,.42],[0,-.085,.018],false,equipmentProfile(item('armor'),kind));
   if(item('boots'))for(const side of ['Left','Right'])this.add('boots',side+'Foot',[.205,.35,.34],[0,.04,.035],side==='Right',equipmentProfile(item('boots'),kind));
-  if(item('wings')){const p=equipmentProfile(item('wings'),kind),n=p.tier;this.add('wings','Spine2',[[2.05,1.1,.22],[2.7,1.35,.24],[3.35,1.6,.27]][n],[0,.16,-.3],false,p);}
-  if(item('cloak')){const p=equipmentProfile(item('cloak'),kind),dimensions=[[.78,1.13,.19],[1.05,1.3,.22],[1.35,1.45,.24]][p.tier];this.add('cloak','Spine2',dimensions,[0,.10-dimensions[1]*.5,-.29],false,p);}
-  if(item('weapon')){const p=equipmentProfile(item('weapon'),kind),n=p.tier;if(kind==='sword')this.add('weapon','RightHand',[p.family==='dao'?.19+n*.035:.13+n*.025,1.45+n*.18,.08],[0,.57,0],false,p);else if(kind==='cultivator')this.add('weapon','Spine2',[.15+n*.02,1.4+n*.12,.075],[.29,-.08,-.43],false,p);else this.addBow(p);}
+  if(item('wings')){const p=equipmentProfile(item('wings'),kind),n=p.tier;this.add('wings','Spine2',[[2.05,1.1,.22],[2.7,1.35,.24],[3.35,1.6,.27],[3.7,1.54,.34]][n],[0,.16,-.3],false,p);}
+  if(item('cloak')){const p=equipmentProfile(item('cloak'),kind),dimensions=[[.78,1.13,.19],[1.05,1.3,.22],[1.35,1.45,.24],[1.29,1.52,.27]][p.tier];this.add('cloak','Spine2',dimensions,[0,.10-dimensions[1]*.5,-.29],false,p);}
+  if(item('weapon')){const p=equipmentProfile(item('weapon'),kind),n=p.tier;if(kind==='sword')this.add('weapon','RightHand',[p.family==='dao'?.19+n*.052:.13+n*.025,1.45+n*.18,.08],[0,.57,0],false,p);else if(kind==='cultivator')this.add('weapon','Spine2',[.15+n*.02,1.4+n*.12,.075],[.29,-.08,-.43],false,p);else this.addBow(p);}
   if(this.view.weapon&&kind==='sword')this.view.weapon.visible=!item('weapon');
  }
  refresh(){
   const equipped=this.state.save.gearEquipped;const key=Object.keys(GEAR_SLOTS).map(slot=>{const g=this.state.gear.find(equipped[slot]);if(!g)return '';const p=equipmentProfile(g,this.state.kind);return p.id+':'+p.tier;}).join('|');
   if(key!==this.signature){this.rebuild();this.signature=key;}
-  for(const p of this.parts){const item=this.state.gear.find(equipped[p.slot]);if(!item)continue;const style=enhancementStyle(item.enhance);p.energy.tint.value.set(style.from).lerp(this.tint.set(style.to),style.mix);p.energy.power.value=style.power;p.energy.rank.value=item.enhance;}
-  const weapon=this.state.gear.find(equipped.weapon);this.weaponStyle=weapon?enhancementStyle(weapon.enhance):null;if(this.view.archerRig){if(this.weaponStyle){const f=this.weaponStyle;this.view.archerRig.string.material.color.set(f.from).lerp(this.tint.set(f.to),f.mix).multiplyScalar(1+f.power*.25);}else this.view.archerRig.string.material.color.setRGB(.8,1.35,1.6);}this.revision=this.state.gear.revision;
+  for(const part of this.parts) this.applyForge(part.energy,this.state.gear.find(equipped[part.slot]),part.profile.tier===3);
+  const weapon=this.state.gear.find(equipped.weapon);
+  this.weaponStyle=weapon?enhancementStyle(weapon.enhance):null;
+  if(this.view.archerRig){
+   this.applyForge(this.bowEnergy,weapon,false);
+   if(this.weaponStyle){const f=this.weaponStyle;this.view.archerRig.string.material.color.set(f.from).lerp(this.tint.set(f.to),f.mix).multiplyScalar(1+f.power*.25);}
+   else this.view.archerRig.string.material.color.setRGB(.8,1.35,1.6);
+  }
+  this.revision=this.state.gear.revision;
+ }
+ applyForge(energy,item,taichu){
+  const rank=item?.enhance||0,style=enhancementStyle(rank);
+  energy.tint.value.set(style.from).lerp(this.tint.set(style.to),style.mix);
+  energy.power.value=item?style.power:0;
+  energy.width.value=style.width;
+  energy.rank.value=rank;
+  energy.taichu.value=Number(taichu);
  }
  update(dt=this.state.time-this.lastTime){
   if(this.revision!==this.state.gear.revision)this.refresh();this.time.value=this.state.time;this.dynamics.update(dt,this.state.player,this.state.time);this.lastTime=this.state.time;
   this.view.pivot.updateWorldMatrix(true,true);this.inverse.copy(this.view.pivot.matrixWorld).invert();
   for(const p of this.parts){if(p.bow)continue;if(p.slot==='armor')p.carrier.matrix.copy(p.rest);else{this.delta.multiplyMatrices(this.inverse,p.binding.bone.matrixWorld).multiply(p.binding.bindInverse);p.carrier.matrix.multiplyMatrices(this.delta,p.rest);}p.carrier.matrixWorldNeedsUpdate=true;}
  }
- dispose(){this.clear();for(const {geo}of this.drapeCache.values())geo.dispose();this.drapeCache.clear();}
+ dispose(){this.clear();for(const {geo}of this.drapeCache.values())geo.dispose();this.drapeCache.clear();this.bowMaterials.forEach(m=>m.dispose());}
 }

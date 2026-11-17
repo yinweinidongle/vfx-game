@@ -8,6 +8,7 @@ import { CLASSES, heightAt } from './GameData.js';
 import { GameArcherRig } from './GameArcherRig.js';
 import { NightEyes } from './NightEyes.js';
 import { EliteInsignia } from './EliteInsignia.js';
+import { TaichuAfterimages } from './TaichuAfterimages.js';
 
 class CharacterTextureLoader extends T.TextureLoader {
   load(url,...callbacks) {
@@ -39,6 +40,7 @@ export class GameActors {
     jobs.push(gltf.loadAsync(`${base}game/models/equipment/loot-library.glb`).then(g=>{this.lootTemplates={};for(const child of g.scene.children)this.lootTemplates[child.name]=child;this.templates.push(g.scene);}));
     const gearJob=GameGearAppearance.load().then(models=>{this.gearTemplates=models;this.templates.push(...new Set(Object.values(models)));});
     await Promise.all([...jobs,gearJob,texturesReady]); this.player = this.create(this.playerSource, this.motion[kind], 2.1, null);
+    this.afterimages=new TaichuAfterimages(this.scene,this.player.model);
     this.addWeapon(this.player, kind === 'ice' ? 'bow' : kind === 'sword' ? 'sword' : null);
     this.weaponMaterials=[];this.growthTint=new T.Color();
     this.player.weapon?.traverse(o=>{if(!o.isMesh)return;const own=m=>{const c=m.clone();this.weaponMaterials.push(c);return c;};o.material=Array.isArray(o.material)?o.material.map(own):own(o.material);});
@@ -127,6 +129,7 @@ export class GameActors {
     view.pivot.rotation.z = p.dash > 0 ? -.25 : T.MathUtils.damp(view.pivot.rotation.z, 0, 12, dt);
     view.archerRig?.update();
     this.gearAppearance?.update(dt);
+    this.afterimages?.update(dt,this.state.stats.taichu&&!this.state.dead,p.x,p.z);
     this.growthTint.set(this.state.growth.color);
     for(const m of this.weaponMaterials)if(m.emissive){m.emissive.copy(this.growthTint);m.emissiveIntensity=this.state.growth.tier*(p.action==='attack'?.3:.09);if(this.gearAppearance?.weaponStyle){const f=this.gearAppearance.weaponStyle;m.emissive.set(f.from).lerp(this.growthTint.set(f.to),f.mix);m.emissiveIntensity+=f.power*.32;}}
     for (const m of view.materials) if (m.emissive) m.emissive.setRGB(p.hurtFlash > 0 ? .16 : 0, 0, 0);
@@ -156,7 +159,7 @@ export class GameActors {
     v.model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.dispose();});
   }
   dispose() {
-    this.nightEyes.dispose();this.gearAppearance?.dispose();
+    this.nightEyes.dispose();this.gearAppearance?.dispose();this.afterimages?.dispose();
     const views = [this.player,this.warmActor, ...this.enemies.values()].filter(Boolean);
     for (const v of views) this.release(v);
     this.weaponMaterials?.forEach(m=>m.dispose());

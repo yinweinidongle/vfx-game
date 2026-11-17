@@ -20,6 +20,8 @@ import { GameRouteGuide } from './GameRouteGuide.js';
 import { GameSkillCamera } from './GameSkillCamera.js';
 import { GameUI } from './GameUI.js';
 import { AwakeningPresentation } from './AwakeningPresentation.js';
+import { TaichuReveal, TAICHU_REVEAL_TIME } from './TaichuReveal.js';
+import { TAICHU_RARITY } from './EquipmentCatalog.js';
 import { SAVE_KEY, SETTINGS_KEY, heightAt } from './GameData.js';
 
 export class RPGGame {
@@ -63,8 +65,16 @@ export class RPGGame {
     this.navigation=new GameNavigation(this.state);
     this.guide=new GameRouteGuide(this.scene,this.state,this.navigation);this.guide.update(0);this.guide.group.visible=this.settings.route!==false;await this.guide.loadTexture(`${import.meta.env.BASE_URL}game/art/route-silk-v1.webp`);
     progress('编织技能与光影…');this.fx=new GameFX(this.scene,this.camera,this.state,this.actors);await this.fx.ready;
-    this.ui=new GameUI(this);this.awakeningView=new AwakeningPresentation(this);await Promise.all([this.awakeningView.ready,this.audio.loadAwakening(this.state.kind),this.audio.loot.load(`${import.meta.env.BASE_URL}game/audio/loot/treasure-chimes-v1.wav`)]);this.cameraSnap=true;this.updateCamera(0);this.world.update(0,0);this.actors.update(0);this.fx.update(0);
-    progress('准备战斗演出…');await warmVFX(this.renderer,this.scene,this.camera,[this.fx.group,this.fx.thunder.group,this.fx.ascendant.group,this.fx.loot.group,this.actors.warmActor.group]);this.ready=true;this.paused=false;this.lastTime=performance.now();document.querySelector('#game-loading').hidden=true;
+    this.ui = new GameUI(this);
+    this.awakeningView = new AwakeningPresentation(this);
+    this.lootReveal = new TaichuReveal(this);
+    await Promise.all([this.awakeningView.ready,this.audio.loadAwakening(this.state.kind),
+      this.audio.loot.load(`${import.meta.env.BASE_URL}game/audio/loot/treasure-chimes-v2.wav`)]);
+    this.cameraSnap=true;this.updateCamera(0);this.world.update(0,0);this.actors.update(0);this.fx.update(0);
+    progress('准备战斗演出…');
+    await warmVFX(this.renderer,this.scene,this.camera,[this.fx.group,this.fx.thunder.group,this.fx.ascendant.group,
+      this.fx.loot.group,this.lootReveal.group,this.actors.afterimages.group,this.actors.warmActor.group]);
+    this.ready=true;this.paused=false;this.lastTime=performance.now();document.querySelector('#game-loading').hidden=true;
     document.querySelector('#game-hud').hidden=false;
     if (this.save() === false && this.storage) { this.saveProblem(); return this; }
     if(this.state.pendingBoons)this.ui.boon();else if(this.state.save.playTime<1)this.ui.tutorial();
@@ -77,8 +87,8 @@ export class RPGGame {
     const target=this.state.aimTarget(this.aim.x,this.aim.z,26);this.state.lockedTarget=target;
     if(target){this.targetRing.position.set(target.x,heightAt(target.x,target.z)+.09,target.z);this.targetRing.scale.setScalar(2.5*target.scale);this.targetRing.material.color.set('#f3c77f');}else{this.targetRing.scale.setScalar(1);this.targetRing.material.color.set('#c6f6ed');}
   }
-  cast(index) { if(this.paused||!this.ready)return;this.audio.start();this.updateAim();this.state.cast(index,this.aim.x,this.aim.z); }
-  heal() { if(!this.paused)this.state.heal(); }
+  cast(index) { if(this.paused||!this.ready||this.lootReveal?.active)return;this.audio.start();this.updateAim();this.state.cast(index,this.aim.x,this.aim.z); }
+  heal() { if(!this.paused&&!this.lootReveal?.active)this.state.heal(); }
   configure(changes) {
     Object.assign(this.settings,changes);this.audio?.setVolume(this.settings.volume);this.audio?.setMusicMuted(this.settings.musicMuted===true);
     const q=this.settings.quality;this.dpr=Math.min(window.devicePixelRatio||1,q==='high'?1.75:q==='low'?.8:q==='medium'?1.1:1.35);
@@ -93,22 +103,32 @@ export class RPGGame {
   updateCamera(dt) {
     const p=this.state.player,age=this.fx?.divineAge??100,framing=age<4.7?Math.min(1,age*3)*Math.min(1,(4.7-age)*.8):0;
     this.daylight?.update(this.state.cycle,framing);
-    const thunder=this.awakeningView?.darkness||0;
+    const reveal = this.lootReveal?.active;
+    const thunder = reveal ? .57 : this.awakeningView?.darkness||0;
     if(thunder>0){this.sun.intensity*=1-thunder*.55;this.sky.intensity*=1-thunder*.35;this.scene.environmentIntensity*=1-thunder*.35;this.scene.background.lerp(this.daylight.colors.night,thunder*.56);this.scene.fog.color.copy(this.scene.background);}
     const cx=p.x+((this.fx?.divineTargetX??p.x)-p.x)*framing*.2,cz=p.z+((this.fx?.divineTargetZ??p.z)-p.z)*framing*.2,zoom=this.zoom+framing*3.8;
     this.cameraTarget.set(cx,heightAt(p.x,p.z)+1.2+framing*1.2,cz);
     const x=cx+Math.sin(this.cameraYaw)*zoom,y=heightAt(p.x,p.z)+zoom*.85,z=cz+Math.cos(this.cameraYaw)*zoom;
-    this.cameraEye.set(x,y,z);this.skillCamera.update(dt,this.cameraEye,this.cameraTarget);
+    this.cameraEye.set(x,y,z);this.skillCamera.update(reveal ? 0 : dt,this.cameraEye,this.cameraTarget);
+    this.lootReveal?.frame(this.cameraEye,this.cameraTarget);
+    this.targetRing.visible = !reveal;
     const alpha=this.cameraSnap?1:1-Math.exp(-dt*9);
     this.camera.position.lerp(this.cameraEye,alpha);
-    if(this.settings.shake&&this.shake>0){this.camera.position.x+=Math.sin(this.state.time*91)*this.shake;this.camera.position.y+=Math.cos(this.state.time*77)*this.shake*.65;}
+    if(!reveal&&this.settings.shake&&this.shake>0){this.camera.position.x+=Math.sin(this.state.time*91)*this.shake;this.camera.position.y+=Math.cos(this.state.time*77)*this.shake*.65;}
     this.camera.lookAt(this.cameraTarget);this.camera.updateMatrixWorld();this.cameraSnap=false;this.shake=Math.max(0,this.shake-dt*1.5);
 
   }
   handleEvents() {
     const events=this.state.events.splice(0);
     this.audio.loot.handle(events,this.state.player,this.camera);
-    if (events.some(e => e.type === 'gearDrop')) this.ui.lootRevealTime = .25;
+    const taichu = events.find(e => e.type==='gearDrop' && e.rarity===TAICHU_RARITY);
+    if (taichu && this.lootReveal?.begin(taichu)) {
+      this.accumulator = 0;
+      this.ui.lootRevealTime = TAICHU_REVEAL_TIME + .13;
+      this.awakeningView.root.classList.add('covered-by-loot');
+    } else if (events.some(e => e.type === 'gearDrop')) {
+      this.ui.lootRevealTime = Math.max(this.ui.lootRevealTime || 0, .25);
+    }
     for(const e of events){
       if(e.type==='spawn')this.actors.spawn(e.enemy);
       if(e.type==='attack'||e.type==='cast')this.actors.attack(e.index>=2);
@@ -122,20 +142,42 @@ export class RPGGame {
         this.shake=Math.max(this.shake,e.wave===3?.16:.055);
       }
       if(e.type==='hit'&&e.element==='slash'){this.shake=Math.max(this.shake,.09);this.hitStop=.025;}
+      if(e.type==='taichuMeteorImpact')this.shake=Math.max(this.shake,.15);
       if(e.type==='hurt')this.shake=.16;if(e.type==='divine')this.shake=.1;
       this.fx.handle(e);
       const quietEcho=e.fervor&&(e.fervorSplash||this.state.time-(this.lastFervorSound??-1)<.09);
-      if(!quietEcho&&e.element!=='awakening'&&(e.element!=='halo'||this.state.time-(this.lastHaloSound??-1)>.09)){this.audio.play(['fervorUpgrade','vitalityUpgrade','spiritUpgrade'].includes(e.type)?'level':e.type);if(e.element==='halo')this.lastHaloSound=this.state.time;if(e.fervor)this.lastFervorSound=this.state.time;}this.ui.handle(e);
+      if(!e.banked&&!quietEcho&&e.element!=='awakening'&&e.element!=='taichu'&&(e.element!=='halo'||this.state.time-(this.lastHaloSound??-1)>.09)){this.audio.play(['fervorUpgrade','vitalityUpgrade','spiritUpgrade'].includes(e.type)?'level':e.type);if(e.element==='halo')this.lastHaloSound=this.state.time;if(e.fervor)this.lastFervorSound=this.state.time;}this.ui.handle(e);
     }
   }
   tick(now) {
     this.raf=requestAnimationFrame(this.tick);const rawDt=Math.max(0,(now-this.lastTime)/1000),dt=Math.min(rawDt,.05);this.lastTime=now;
     if(this.ready&&!this.paused){
-      this.input.update();if(this.input.dx||this.input.dz||this.state.player.dash>0)this.skillCamera.cancel();
-      const simDt=dt*this.skillCamera.timeScale*(this.awakeningView?.timeScale??1);this.updateAim();this.accumulator+=simDt;this.hitStop=Math.max(0,this.hitStop-dt);
-      if(this.input.attacking)this.state.attack(this.aim.x,this.aim.z);
-      let steps=0;while(this.accumulator>=1/60&&steps<4){if(this.hitStop<=0)this.state.update(1/60,this.input);this.accumulator-=1/60;steps++;}
-      this.handleEvents();this.awakeningView.update(dt);this.updateCamera(dt);this.actors.update(this.hitStop>0?0:simDt);this.world.update(this.state.time,simDt);if(this.skillCamera.weight>0)this.world.hero.value.lerp(this.cameraTarget,this.skillCamera.weight);this.fx.update(this.hitStop>0?0:simDt);this.guide.update(this.state.time);
+      let simDt = 0;
+      if (!this.lootReveal.active) {
+        this.input.update();
+        if(this.input.dx||this.input.dz||this.state.player.dash>0)this.skillCamera.cancel();
+        simDt=dt*this.skillCamera.timeScale*this.awakeningView.timeScale;
+        this.updateAim();
+        this.accumulator+=simDt;
+        this.hitStop=Math.max(0,this.hitStop-dt);
+        if(this.input.attacking)this.state.attack(this.aim.x,this.aim.z);
+        let steps=0;
+        while(this.accumulator>=1/60&&steps<4){
+          if(this.hitStop<=0)this.state.update(1/60,this.input);
+          this.accumulator-=1/60;steps++;
+        }
+      }
+      this.handleEvents();
+      const revealing = this.lootReveal.active;
+      const motionDt = revealing || this.hitStop > 0 ? 0 : simDt;
+      if (!revealing) this.awakeningView.update(dt);
+      this.lootReveal.update(dt);
+      this.updateCamera(dt);
+      this.actors.update(motionDt);
+      this.world.update(this.state.time,revealing ? 0 : simDt);
+      if(this.skillCamera.weight>0)this.world.hero.value.lerp(this.cameraTarget,this.skillCamera.weight);
+      this.fx.update(motionDt, revealing ? dt : motionDt,revealing);
+      this.guide.update(this.state.time);
       this.saveClock+=dt;if((this.saveClock>5||this.state.saveDirty) && now>=this.saveAgainAfter){this.save();this.saveClock=0;}
     }else if(!this.ready)this.updateCamera(dt);
     if(this.ready&&(!this.paused||this.needsRender)){this.renderer.info.reset();this.composer.render();this.needsRender=false;this.frames++;this.frameTime+=rawDt;}
@@ -170,5 +212,5 @@ export class RPGGame {
     }
     window.location.href = 'game.html?continue=1';
   }
-  dispose() { if(this.ready)this.save();window.removeEventListener('storage',this.onStorageChange);cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.awakeningView?.dispose();this.ui?.lootLabels?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
+  dispose() { if(this.ready)this.save();window.removeEventListener('storage',this.onStorageChange);cancelAnimationFrame(this.raf);this.input.dispose();this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.onVisibility);this.lootReveal?.dispose();this.awakeningView?.dispose();this.ui?.lootLabels?.dispose();this.fx?.dispose();this.guide?.dispose();this.actors.dispose();this.daylight.dispose();this.world.dispose();this.audio.dispose();this.targetRing.geometry.dispose();this.targetRing.material.dispose();for(const pass of this.composer.passes)pass.dispose();this.composer.dispose();this.environment.dispose();this.sun.shadow.dispose();this.renderer.dispose(); }
 }

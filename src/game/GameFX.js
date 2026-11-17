@@ -17,6 +17,7 @@ import { GameShieldVFX } from './GameShieldVFX.js';
 import { GameSkillResonance } from './GameSkillResonance.js';
 import { GameThunderVFX } from './GameThunderVFX.js';
 import { GameSpiritBolts, isSpiritBolt } from './GameSpiritBolts.js';
+import { TaichuMeteorVFX } from './TaichuMeteorVFX.js';
 
 const N=96,SHARDS=600;
 const PALETTE={enemy:'#d069a5',arrow:'#79ddff',frost:'#70dfff',spirit:'#a6a3ff',slash:'#8aa0ff',star:'#ffd29a',heal:'#8aefbf'};
@@ -52,6 +53,7 @@ export class GameFX {
     });
     this.storm = new MeteorStorm(this.group, camera, { ...defaults, meteorCount: 28, meteorSize: .65, impactRadius: 1.2, particleDensity: .7 });
     this.storm.group.visible = false; this.divineAge = 100; this.portal = new MagicMandala(this.group, 4.8); this.portal.mesh.visible = false;
+    this.taichuMeteor=new TaichuMeteorVFX(this.group,camera,state.taichuSet);
     this.targetSeal=new MagicMandala(this.group,5);this.targetSeal.mesh.visible=false;
     this.installSpirit();
     this.haloBolts=new HaloBolts(this.group,camera,defaults,state.haloVolley.bolts.length);this.haloBolts.events=state.haloVolley.bolts;
@@ -120,7 +122,11 @@ export class GameFX {
     if(event.type==='revive'){this.divineAge=100;this.projectileTrails.reset();for(const slot of this.bladePool){slot.trail.reset();slot.projectile=null;slot.group.visible=false;}for(const b of this.bursts)b.alive=false;for(const p of this.shards)p.alive=false;this.melee=null;}
     if(event.type==='attack'&&event.kind==='ice'){const p=this.state.attackSocket||this.state.player;this.burst(p.x,p.z,'arrow',.18,3);}
     if(event.type==='hit'&&event.fervor&&!event.fervorSplash)this.burst(event.x,event.z,'spirit',event.finisher?event.finishRadius:.4,event.finisher?12:3,{color:event.color,radiance:1.35,tier:event.finisher?3:0});
-    if (event.type === 'hit'&&event.element!=='halo'&&event.element!=='awakening'&&!event.fervor&&!(this.spiritBolts&&event.element==='spirit'&&event.primary)) this.burst(event.x,event.z,event.element,event.element==='frost'||event.element==='slash'?1.5:.65,event.element==='arrow'?7:12,event.echo?{color:event.color,radiance:event.radiance,spiritLevel:event.spiritLevel,skillStage:event.skillStage,skillAccent:event.skillAccent,echo:true}:event);
+    if (event.type === 'hit'&&event.element!=='halo'&&event.element!=='awakening'&&event.element!=='taichu'&&!event.fervor&&!(this.spiritBolts&&event.element==='spirit'&&event.primary)) this.burst(event.x,event.z,event.element,event.element==='frost'||event.element==='slash'?1.5:.65,event.element==='arrow'?7:12,event.echo?{color:event.color,radiance:event.radiance,spiritLevel:event.spiritLevel,skillStage:event.skillStage,skillAccent:event.skillAccent,echo:true}:event);
+    if(event.type==='taichuMeteorImpact'){
+      this.baseLightPosition.set(event.x,heightAt(event.x,event.z)+1.65,event.z);
+      this.baseLightColor.set('#7ef2c6');this.lightAge=.28;
+    }
     if (event.type === 'burst' || event.type === 'seal' || event.type === 'bossPhase' || event.type === 'ascend') this.burst(event.x, event.z, event.element || 'star', event.radius || 2, 20,event);
     if(event.type==='spawn'&&event.enemy.elite)this.burst(event.enemy.x,event.enemy.z,'enemy',.8,6,{color:event.enemy.color});
     if (event.type === 'divine') this.beginDivine(event);
@@ -137,8 +143,8 @@ export class GameFX {
       }
     }
   }
-  update(dt) {
-    this.thunder.update(dt);this.ascendant.update(dt);this.loot.update(dt);
+  update(dt, lootDt = dt, presentingLoot = false) {
+    this.thunder.update(dt);this.ascendant.update(dt);this.loot.update(lootDt,presentingLoot);this.taichuMeteor.update(this.state.time);
     const t=this.state.time;this.blade.group.visible=false;this.haloBolts.update(t);this.projectileTrails.update(dt,t,this.state.projectiles);
     this.spiritBolts?.update(dt);
     this.fervor.update(dt);this.shield.update(dt);this.resonance.update(dt);
@@ -210,7 +216,7 @@ export class GameFX {
     this.warnings.count = count; this.warnings.instanceMatrix.needsUpdate = true; this.warnings.geometry.attributes.aProgress.needsUpdate = true;
   }
   dispose() {
-    this.thunder.dispose();this.ascendant.dispose();this.loot.dispose();
+    this.thunder.dispose();this.ascendant.dispose();this.loot.dispose();this.taichuMeteor.dispose();
     this.spiritBolts?.dispose();
     this.shield.dispose();this.resonance.dispose();this.fervor.dispose();this.projectileTrails.dispose();for(const s of this.bladePool)s.trail.dispose();this.blade.dispose(); this.storm.dispose(); this.portal.dispose(); this.targetSeal.dispose(); this.halo?.dispose();this.haloBolts.dispose();
     const geometries = new Set(), materials = new Set(); this.group.traverse(o => { if (o.geometry) geometries.add(o.geometry); if (o.material) for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m); });

@@ -6,14 +6,16 @@ const HEALTH = [1, 1.25, 1.65, 2.25, 2.9, 3.7, 4.6, 5.7, 7];
 
 /** Authored regional difficulty: never scales in response to buying an upgrade. */
 export function encounterProfile(encounter, challenge = 0) {
-  const step = clamp((encounter.level || 1) - 1, 0, 8), cycle = clamp(Math.floor(challenge), 0, 20);
+  const step = clamp((encounter.level || 1) - 1, 0, 8), cycle = Math.max(0, Math.floor(challenge));
+  const late = Math.max(0, cycle - 4);
   return {
     level: step + 1 + cycle * 2,
     health: HEALTH[step] * (1 + cycle * .42 + cycle * cycle * .07),
-    damage: (1 + step * .14 + step * step * .009) * (1 + cycle * .18),
+    damage: (1 + step * .14 + step * step * .009) * (1 + cycle * .18 + late * late * .012),
+    defense: step * 3 + 7 * Math.log1p(cycle) + cycle * 1.85,
     speed: 1 + Math.min(.18, step * .025 + cycle * .015),
     recovery: 1 / (1 + step * .035 + Math.min(cycle, 5) * .04),
-    reward: (1 + step * .12) * (1 + cycle * .15),
+    reward: (1 + step * .12) * (1 + cycle * .15 + late * late * .018),
   };
 }
 
@@ -30,7 +32,7 @@ export class EncounterDirector {
       if (s.save.challenge > 1) result.push(wave ? 'stormElite' : 'caster');
       return result;
     });
-    const battle = { encounter, waves, wave: -1, nextIn: 0, requested: 0, done: false };
+    const battle = { encounter, profile:encounterProfile(encounter, s.save.challenge), waves, wave: -1, nextIn: 0, requested: 0, done: false };
     this.active.set(encounter.id, battle); this.deploy(battle);
     s.emit('encounter', { id: encounter.id });
   }
@@ -52,7 +54,7 @@ export class EncounterDirector {
   deploy(battle) {
     const s = this.state, next = battle.wave + 1, types = battle.waves[next];
     if (!types || s.enemies.filter(e => e.hp > 0 && distance(e, battle.encounter) < 38).length + types.length > MAX_ACTIVE_ENEMIES) return false;
-    const placed = [], profile = encounterProfile(battle.encounter, s.save.challenge);
+    const placed = [], profile = battle.profile;
     for (let i = 0; i < types.length; i++) {
       const point = this.placement(battle.encounter, i, next);
       if (!point) {
@@ -64,6 +66,7 @@ export class EncounterDirector {
       const e = { ...spec, ...point, id: s.enemies.length, encounter: battle.encounter.id, type,
         level: profile.level, maxHp: health, hp: health,
         damage: Math.round(spec.damage * profile.damage), speed: spec.speed * profile.speed,
+        defense: Math.round(profile.defense * (type === 'boss' ? 1.28 : spec.elite ? 1.16 : 1)),
         cooldown: spec.cooldown * profile.recovery, xp: Math.round(spec.xp * profile.reward),
         yaw: Math.PI, state: 'chase', timer: .65 + i * .19, spawnGrace: .75,
         frozen: 0, stagger: 0, flash: 0, deathAge: 0, phase: 0, sequence: 0, targetX: 0, targetZ: 0 };

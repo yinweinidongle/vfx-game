@@ -7,12 +7,15 @@ export function createLootMotion(x,z,id,rarity){
  if(!isLand(landX,landZ,.15)){landX=x;landZ=z;}
  return {birthX:x,birthZ:z,landX,landZ,flight:.66+rarity*.07,arc:1.2+rarity*.18,landed:false,seed:id*31.371,y:heightAt(x,z)+.9};
 }
-export function advanceLoot(d,dt,p){
+export function advanceLoot(d,dt,p,hold=.24){
  const flight=d.flight||.7,t=Math.min(1,d.age/flight);
  if(t<1){d.x=d.birthX+(d.landX-d.birthX)*t;d.z=d.birthZ+(d.landZ-d.birthZ)*t;d.y=heightAt(d.birthX,d.birthZ)* (1-t)+heightAt(d.landX,d.landZ)*t+.9*(1-t)+.14*t+4*(d.arc||1.2)*t*(1-t);return false;}
  const landed=!d.landed;if(landed){d.x=d.landX;d.z=d.landZ;}d.landed=true;d.y=heightAt(d.x,d.z)+.14;
- if(d.age>flight+.24&&Math.hypot(d.x-p.x,d.z-p.z)<7){const k=1-Math.exp(-dt*(3+(d.age-flight)*3));d.x+=(p.x-d.x)*k;d.z+=(p.z-d.z)*k;d.y=heightAt(d.x,d.z)+.14;}
+ if(d.age>flight+hold&&Math.hypot(d.x-p.x,d.z-p.z)<7){const k=1-Math.exp(-dt*(3+(d.age-flight)*3));d.x+=(p.x-d.x)*k;d.z+=(p.z-d.z)*k;d.y=heightAt(d.x,d.z)+.14;}
  return landed;
+}
+export function serializeLootMotion(d) {
+ return {lootId:d.lootId,x:d.x,z:d.z,age:d.age,birthX:d.birthX,birthZ:d.birthZ,landX:d.landX,landZ:d.landZ,flight:d.flight,arc:d.arc,landed:d.landed,seed:d.seed};
 }
 export function cleanLootMotion(raw){
  const valid=k=>Number.isFinite(raw[k])&&Math.abs(raw[k])<150;

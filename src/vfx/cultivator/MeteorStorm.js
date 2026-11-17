@@ -12,7 +12,7 @@ varying vec3 vLocal,vNormal,vWorld;
 void main(){vLocal=position;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.);vWorld=world.xyz;vNormal=normalize(mat3(modelMatrix*instanceMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*world;}
 `;
 const rockFragment=`
-uniform float uTime;varying vec3 vLocal,vNormal,vWorld;
+uniform float uTime,uJade;varying vec3 vLocal,vNormal,vWorld;
 ${noiseGLSL}
 void main(){
   float n=fbm(vLocal*3.2);float fissure=abs(fbm(vLocal*4.4)-.48);
@@ -22,6 +22,11 @@ void main(){
   vec3 rock=mix(vec3(.033,.019,.012),vec3(.24,.12,.045),n)*facet;
   float heat=.9+.15*sin(uTime*11.+vWorld.x*2.);
   vec3 lava=mix(vec3(1.6,.12,.009),vec3(2.9,.78,.12),n)*cracks*heat;
+  vec3 jadeRock=mix(vec3(.023,.052,.062),vec3(.14,.33,.25),n)*facet;
+  float rim=pow(clamp(1.-abs(dot(N,normalize(cameraPosition-vWorld))),0.,1.),2.6);
+  vec3 mineral=mix(vec3(.17,1.28,.88),vec3(2.7,3.4,2.05),smoothstep(.29,.71,n));
+  rock=mix(rock,jadeRock,uJade);
+  lava=mix(lava,mineral*cracks*heat+vec3(.45,1.45,.92)*rim*.42,uJade);
   gl_FragColor=vec4(rock+lava,1.);
 }
 `;
@@ -30,7 +35,7 @@ attribute float aLife;varying vec2 vUv;varying float vLife;
 void main(){vUv=uv;vLife=aLife;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}
 `;
 const trailFragment=`
-uniform float uTime;varying vec2 vUv;varying float vLife;${noiseGLSL}
+uniform float uTime,uJade;varying vec2 vUv;varying float vLife;${noiseGLSL}
 void main(){
  float side=abs(vUv.y*2.-1.),s=vUv.x;
  float n=fbm(vec3(s*7.-uTime*5.,vUv.y*3.,uTime*.3));
@@ -40,6 +45,10 @@ void main(){
  float core=pow(max(0.,1.-side),5.)*(1.-s)*1.2;
  vec3 col=mix(vec3(.9,.12,.012),vec3(1.7,.68,.08),1.-s);
  col=mix(col,vec3(2.1,1.2,.3),clamp(core,0.,1.));
+ float strand=exp(-abs(vUv.y-.5-(n-.5)*s*.6)*18.)*(.34+.66*n);
+ vec3 jade=mix(vec3(.021,1.06,.86),vec3(.60,2.42,1.53),1.-s);
+ jade=mix(jade,vec3(3.9,3.65,2.23),clamp((core+strand*.35)*(1.-s),0.,1.));
+ col=mix(col,jade,uJade);
  float alpha=edge*fade*vLife*(.35+n*.5);
  if(alpha<.006)discard;gl_FragColor=vec4(col,alpha);
 }
@@ -49,6 +58,7 @@ attribute float aAge,aPower;varying vec2 vUv;varying float vAge,vPower;
 void main(){vUv=uv;vAge=aAge;vPower=aPower;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}
 `;
 const ringFragment=`
+uniform float uJade;
 varying vec2 vUv;varying float vAge,vPower;${noiseGLSL}
 void main(){
  if(vAge<0.||vAge>1.2)discard;vec2 p=vUv*2.-1.;float r=length(p),a=atan(p.y,p.x);
@@ -58,25 +68,30 @@ void main(){
  float fissure=pow(max(0.,cos(a*11.+noise(vec3(p*3.,0.))*5.)),32.)*(1.-smoothstep(.25,.75,r));
  float fade=pow(max(0.,1.-vAge/1.2),2.);
  float alpha=(rim+inner+fissure*.4)*fade*vPower;
- if(alpha<.008)discard;gl_FragColor=vec4(vec3(1.65,.68,.12),alpha);
+ if(alpha<.008)discard;
+ vec3 jade=mix(vec3(.10,1.50,1.14),vec3(2.15,2.96,1.64),clamp(rim*.69+inner*.39,0.,1.));
+ gl_FragColor=vec4(mix(vec3(1.65,.68,.12),jade,uJade),alpha);
 }
 `;
 const burstFragment=`
+uniform float uJade;
 varying vec2 vUv;varying float vAge,vPower;${noiseGLSL}
 void main(){
  if(vAge<0.||vAge>.32)discard;vec2 p=vUv*2.-1.;float r=length(p),a=atan(p.y,p.x);
  float arms=pow(max(0.,cos(a*7.)),14.)*(1.-smoothstep(.3,.98,r));
- float star=exp(-r*14.)*1.7+arms*.75;
+ float cross=(exp(-abs(p.x)*74.)*(1.-smoothstep(.03,.99,abs(p.y)))+exp(-abs(p.y)*96.)*(1.-smoothstep(.04,.87,abs(p.x))))*exp(-vAge*12.);
+ float star=exp(-r*14.)*1.7+arms*.75+cross*uJade;
  float alpha=star*pow(max(0.,1.-vAge/.32),2.)*vPower*1.45;
- if(alpha<.005)discard;gl_FragColor=vec4(2.6,1.55,.55,alpha);
+ if(alpha<.005)discard;gl_FragColor=vec4(mix(vec3(2.6,1.55,.55),mix(vec3(.25,2.42,1.38),vec3(4.0,4.05,2.8),clamp(cross+exp(-r*6.),0.,1.)),uJade),alpha);
 }
 `;
 const smokeFragment=`
+uniform float uJade;
 varying vec2 vUv;varying float vAge,vPower;${noiseGLSL}
 void main(){
  if(vAge<0.||vAge>1.3)discard;vec2 p=vUv*2.-1.;float n=fbm(vec3(p*3.,vAge*.8));
- float a=(1.-smoothstep(.22,.95,length(p)+(n-.5)*.25))*smoothstep(0.,.15,vAge)*(1.-smoothstep(.4,1.3,vAge))*.19*vPower;
- if(a<.005)discard;gl_FragColor=vec4(mix(vec3(.18,.115,.065),vec3(.47,.29,.12),n),a);
+ float a=(1.-smoothstep(.22,.95,length(p)+(n-.5)*.25))*smoothstep(0.,.15,vAge)*(1.-smoothstep(.4,1.3,vAge))*mix(.19,.28,uJade)*vPower;
+ if(a<.005)discard;gl_FragColor=vec4(mix(mix(vec3(.18,.115,.065),vec3(.47,.29,.12),n),mix(vec3(.033,.091,.085),vec3(.18,.38,.29),n),uJade),a);
 }
 `;
 
@@ -103,42 +118,46 @@ export function meteorPosition(event,time,out){
 
 /** Pooled rocks, trajectory ribbons, impact layers and ballistic debris. */
 export class MeteorStorm{
- constructor(parent,camera,config){
+ constructor(parent,camera,config,externalEvents=null){
   this.camera=camera;this.config=config;this.group=new THREE.Group();this.group.name='Celestial meteor storm';parent.add(this.group);
+  this.externalEvents=externalEvents;const capacity=externalEvents?.length||MAX,jade=!!config.jade;this.jade=jade;
+  this.particleCapacity=externalEvents?capacity*34:PARTICLES;
+  const theme={value:Number(jade)};
   this.events=[];this.position=new THREE.Vector3();this.previous=new THREE.Vector3();this.velocity=new THREE.Vector3();this.view=new THREE.Vector3();this.side=new THREE.Vector3();this.up=new THREE.Vector3();this.point=new THREE.Vector3();
   this.dummy=new THREE.Object3D();this.yAxis=new THREE.Vector3(0,1,0);this.color=new THREE.Color();
   const rock=new THREE.IcosahedronGeometry(1,2),pos=rock.attributes.position;
   // Consistent object-space fracture silhouette; instance rotation supplies variation.
   for(let i=0;i<pos.count;i++){this.point.fromBufferAttribute(pos,i);const f=.86+.18*Math.sin(this.point.x*13+this.point.y*7)*Math.sin(this.point.z*11+2);this.point.multiplyScalar(f);this.point.y*=1.18;pos.setXYZ(i,this.point.x,this.point.y,this.point.z);}rock.computeVertexNormals();
-  this.rockMaterial=new THREE.ShaderMaterial({uniforms:{uTime:{value:0}},vertexShader:rockVertex,fragmentShader:rockFragment});
-  this.rocks=new THREE.InstancedMesh(rock,this.rockMaterial,MAX);this.rocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.rocks.frustumCulled=false;this.group.add(this.rocks);
-  const vertices=MAX*SECTIONS*4,triangles=[];
+  this.rockMaterial=new THREE.ShaderMaterial({uniforms:{uTime:{value:0},uJade:theme},vertexShader:rockVertex,fragmentShader:rockFragment});
+  this.rocks=new THREE.InstancedMesh(rock,this.rockMaterial,capacity);this.rocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.rocks.frustumCulled=false;this.group.add(this.rocks);
+  const vertices=capacity*SECTIONS*4,triangles=[];
   this.trailPositions=new Float32Array(vertices*3);const uv=new Float32Array(vertices*2);this.trailLife=new Float32Array(vertices);
-  for(let i=0;i<MAX;i++)for(let plane=0;plane<2;plane++)for(let j=0;j<SECTIONS;j++){
+  for(let i=0;i<capacity;i++)for(let plane=0;plane<2;plane++)for(let j=0;j<SECTIONS;j++){
    const a=i*SECTIONS*4+plane*SECTIONS*2+j*2;uv.set([j/(SECTIONS-1),0,j/(SECTIONS-1),1],a*2);
    if(j<SECTIONS-1)triangles.push(a,a+1,a+2,a+1,a+3,a+2);
   }
   this.trailGeometry=new THREE.BufferGeometry();this.trailGeometry.setAttribute('position',new THREE.BufferAttribute(this.trailPositions,3).setUsage(THREE.DynamicDrawUsage));this.trailGeometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));this.trailGeometry.setAttribute('aLife',new THREE.BufferAttribute(this.trailLife,1).setUsage(THREE.DynamicDrawUsage));this.trailGeometry.setIndex(triangles);
-  this.trailMaterial=new THREE.ShaderMaterial({uniforms:{uTime:{value:0}},vertexShader:trailVertex,fragmentShader:trailFragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+  this.trailMaterial=new THREE.ShaderMaterial({uniforms:{uTime:{value:0},uJade:theme},vertexShader:trailVertex,fragmentShader:trailFragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
   this.trails=new THREE.Mesh(this.trailGeometry,this.trailMaterial);this.trails.frustumCulled=false;this.trails.renderOrder=3;this.group.add(this.trails);
-  this.hitAge=new Float32Array(MAX);this.hitPower=new Float32Array(MAX);
+  this.hitAge=new Float32Array(capacity);this.hitPower=new Float32Array(capacity);
   const hitGeometry=new THREE.PlaneGeometry(2,2);hitGeometry.setAttribute('aAge',new THREE.InstancedBufferAttribute(this.hitAge,1).setUsage(THREE.DynamicDrawUsage));hitGeometry.setAttribute('aPower',new THREE.InstancedBufferAttribute(this.hitPower,1));
-  const makeHit=(fragment,blend)=>{const mat=new THREE.ShaderMaterial({vertexShader:hitVertex,fragmentShader:fragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:blend});const mesh=new THREE.InstancedMesh(hitGeometry,mat,MAX);mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.group.add(mesh);return mesh;};
+  const makeHit=(fragment,blend)=>{const mat=new THREE.ShaderMaterial({uniforms:{uJade:theme},vertexShader:hitVertex,fragmentShader:fragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:blend});const mesh=new THREE.InstancedMesh(hitGeometry,mat,capacity);mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.group.add(mesh);return mesh;};
   this.rings=makeHit(ringFragment,THREE.AdditiveBlending);this.bursts=makeHit(burstFragment,THREE.AdditiveBlending);this.smoke=makeHit(smokeFragment,THREE.NormalBlending);this.smoke.renderOrder=5;
-  const shardMat=new THREE.MeshStandardMaterial({color:'#6f4225',roughness:.85,metalness:.15,emissive:'#ef7a16',emissiveIntensity:.24});
-  this.shards=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),shardMat,MAX*6);this.shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.shards.frustumCulled=false;this.group.add(this.shards);
-  this.particlePositions=new Float32Array(PARTICLES*3);this.particleSize=new Float32Array(PARTICLES);this.particleOpacity=new Float32Array(PARTICLES);
+  const shardMat=new THREE.MeshStandardMaterial({color:jade?'#359d85':'#6f4225',roughness:.85,metalness:.15,emissive:jade?'#7affaf':'#ef7a16',emissiveIntensity:jade?1.12:.24});
+  this.shards=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),shardMat,capacity*(externalEvents?12:6));this.shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.shards.frustumCulled=false;this.group.add(this.shards);
+  this.particlePositions=new Float32Array(this.particleCapacity*3);this.particleSize=new Float32Array(this.particleCapacity);this.particleOpacity=new Float32Array(this.particleCapacity);
   const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(this.particlePositions,3).setUsage(THREE.DynamicDrawUsage));pg.setAttribute('aSize',new THREE.BufferAttribute(this.particleSize,1).setUsage(THREE.DynamicDrawUsage));pg.setAttribute('aOpacity',new THREE.BufferAttribute(this.particleOpacity,1).setUsage(THREE.DynamicDrawUsage));
-  const pm=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:`attribute float aSize,aOpacity;varying float vAlpha;void main(){vAlpha=aOpacity;vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aSize*550./max(.1,-mv.z),1.,55.);}`,fragmentShader:`varying float vAlpha;void main(){vec2 p=gl_PointCoord*2.-1.;float r=length(p);float star=exp(-r*4.)*(1.-smoothstep(.65,1.,r));float a=star*vAlpha;if(a<.005)discard;gl_FragColor=vec4(1.9,1.05,.25,a);}`});
+  const pm=new THREE.ShaderMaterial({uniforms:{uJade:theme},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:`attribute float aSize,aOpacity;varying float vAlpha;void main(){vAlpha=aOpacity;vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aSize*550./max(.1,-mv.z),1.,55.);}`,fragmentShader:`uniform float uJade;varying float vAlpha;void main(){vec2 p=gl_PointCoord*2.-1.;float r=length(p);float star=exp(-r*4.)*(1.-smoothstep(.65,1.,r));float a=star*vAlpha;if(a<.005)discard;gl_FragColor=vec4(mix(vec3(1.9,1.05,.25),vec3(2.25,2.66,1.36),uJade),a);}`});
   this.points=new THREE.Points(pg,pm);this.points.frustumCulled=false;this.group.add(this.points);
   this.configure(config);this.reset();
  }
- configure(config){this.config=config;this.events=makeStormSchedule(config);this.firstImpact=this.events[0].hit;this.lastImpact=Math.max(...this.events.map(e=>e.hit));this.duration=this.lastImpact+1.4;this.rings.count=this.bursts.count=this.smoke.count=this.events.length;for(const e of this.events)this.hitPower[e.i]=e.hero?1:e.i%3===0?.6:.3;this.rings.geometry.attributes.aPower.needsUpdate=true;}
- particle(p,size,alpha){if(this.particleCount>=PARTICLES||alpha<=0)return;const i=this.particleCount++;p.toArray(this.particlePositions,i*3);this.particleSize[i]=size;this.particleOpacity[i]=alpha;}
+ configure(config){this.config=config;this.events=this.externalEvents||makeStormSchedule(config);if(!this.externalEvents){this.firstImpact=this.events[0].hit;this.lastImpact=Math.max(...this.events.map(e=>e.hit));this.duration=this.lastImpact+1.4;}this.rings.count=this.bursts.count=this.smoke.count=this.events.length;for(const e of this.events)this.hitPower[e.i]=e.hero?1:e.i%3===0?.6:.3;this.rings.geometry.attributes.aPower.needsUpdate=true;}
+ particle(p,size,alpha){if(this.particleCount>=this.particleCapacity||alpha<=0)return;const i=this.particleCount++;p.toArray(this.particlePositions,i*3);this.particleSize[i]=size;this.particleOpacity[i]=alpha;}
  update(t){
   this.time=t;this.rockMaterial.uniforms.uTime.value=t;this.trailMaterial.uniforms.uTime.value=t;
   let rocks=0,tails=0,shards=0;this.particleCount=0;this.impactPulse=0;
   for(const e of this.events){
+   if(e.active===false){this.hitAge[e.i]=-1;continue;}
    const age=t-e.hit,flight=t>=e.launch&&age<0,drain=clamp(1-age/.22,0,1);
    this.hitAge[e.i]=age;
    if(flight){
@@ -158,24 +177,27 @@ export class MeteorStorm{
     }tails++;
    }
    const active=age>=0&&age<1.35,hitScale=(e.hero?1.05:.4+e.radius)*((this.config.impactRadius??1.6)/1.6);
-   this.dummy.position.set(e.end.x,.035+(e.i%3)*.004,e.end.z);this.dummy.rotation.set(-Math.PI/2,0,e.i);this.dummy.scale.setScalar(active?(.3+Math.max(0,age)*4.6)*hitScale:.0001);this.dummy.updateMatrix();this.rings.setMatrixAt(e.i,this.dummy.matrix);
+   const ground=e.groundY??0;
+   this.dummy.position.set(e.end.x,ground+.035+(e.i%3)*.004,e.end.z);this.dummy.rotation.set(-Math.PI/2,0,e.i);this.dummy.scale.setScalar(active?(.3+Math.max(0,age)*(this.jade?7.2:4.6))*hitScale:.0001);this.dummy.updateMatrix();this.rings.setMatrixAt(e.i,this.dummy.matrix);
    this.dummy.position.copy(e.end);this.dummy.quaternion.copy(this.camera.quaternion);this.dummy.scale.setScalar(active?(1.+Math.min(age,.2)*7)*hitScale:.0001);this.dummy.updateMatrix();this.bursts.setMatrixAt(e.i,this.dummy.matrix);
-   this.dummy.position.set(e.end.x,.3+Math.max(0,age)*.65,e.end.z);this.dummy.scale.setScalar(active?(.4+Math.max(0,age)*1.8)*hitScale:.0001);this.dummy.updateMatrix();this.smoke.setMatrixAt(e.i,this.dummy.matrix);
+   this.dummy.position.set(e.end.x,ground+.3+Math.max(0,age)*.65,e.end.z);this.dummy.scale.setScalar(active?(.4+Math.max(0,age)*1.8)*hitScale:.0001);this.dummy.updateMatrix();this.smoke.setMatrixAt(e.i,this.dummy.matrix);
    if(active){
     this.impactPulse=Math.max(this.impactPulse,Math.exp(-age*18)*(e.hero?1:.35));
     const life=1.1,fade=clamp(1-age/life,0,1),motion=(1-Math.exp(-age*1.4))/1.4;
     for(let j=0;j<(e.hero?12:4);j++){
      const id=e.i*13+j,angle=stormRandom(id,11)*Math.PI*2,v=(1.2+stormRandom(id,12)*3.4)*(e.hero?1.5:1);
      const y=e.end.y+(.9+stormRandom(id,13)*3)*age-3.8*age*age;
-     if(y<.03||fade<=0)continue;
+     if(y<ground+.03||fade<=0)continue;
      this.dummy.position.set(e.end.x+Math.cos(angle)*v*motion,y,e.end.z+Math.sin(angle)*v*motion);
-     this.dummy.rotation.set(age*(3+id%5),age*(id%7-3),id+age*4);this.dummy.scale.setScalar((.035+stormRandom(id,15)*.09)*(e.hero?1.5:1)*fade);this.dummy.updateMatrix();this.shards.setMatrixAt(shards++,this.dummy.matrix);
+     this.dummy.rotation.set(age*(3+id%5),age*(id%7-3),id+age*4);
+     const size=(.035+stormRandom(id,15)*.09)*(e.hero?1.5:1)*fade;
+     this.dummy.scale.set(size,size*(this.jade&&j<4?2.3:1),size*(this.jade?.76:1));this.dummy.updateMatrix();this.shards.setMatrixAt(shards++,this.dummy.matrix);
     }
     const density=Math.round(12*(this.config.particleDensity??1));
     for(let j=0;j<density;j++){
      const id=e.i*37+j,angle=stormRandom(id,21)*Math.PI*2,v=1+stormRandom(id,22)*4;
      this.point.set(e.end.x+Math.cos(angle)*v*motion,e.end.y+(.5+stormRandom(id,23)*4)*age-2.1*age*age,e.end.z+Math.sin(angle)*v*motion);
-     if(this.point.y>.03)this.particle(this.point,.025+stormRandom(id,24)*.07,fade);
+     if(this.point.y>ground+.03)this.particle(this.point,.025+stormRandom(id,24)*.07,fade);
     }
    }
    if(flight){
@@ -183,8 +205,8 @@ export class MeteorStorm{
    }
   }
   // Ascending spiritual motes around the caster, rather than undirected spray.
-  const aura=THREE.MathUtils.smoothstep(t,0,.5)*(1-THREE.MathUtils.smoothstep(t,this.duration-1.1,this.duration));
-  for(let i=0;i<110*(this.config.particleDensity??1);i++){
+  const aura=this.externalEvents?0:THREE.MathUtils.smoothstep(t,0,.5)*(1-THREE.MathUtils.smoothstep(t,this.duration-1.1,this.duration));
+  for(let i=0;aura>0&&i<110*(this.config.particleDensity??1);i++){
    const p=(stormRandom(i,41)+t*(.16+stormRandom(i,42)*.2))%1,a=stormRandom(i,43)*Math.PI*2+t*.5,r=1.2*(1-p)+.25;
    this.point.set(-8.4+Math.cos(a)*r,.1+p*3.1,Math.sin(a)*r);this.particle(this.point,.018+stormRandom(i,44)*.035,aura*Math.sin(p*Math.PI)*.6);
   }

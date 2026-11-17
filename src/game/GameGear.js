@@ -1,6 +1,6 @@
-import { createLootMotion } from './LootMotion.js';
+import { createLootMotion, serializeLootMotion } from './LootMotion.js';
 import { weaponKind } from './EquipmentCatalog.js';
-import { GEAR_CAPACITY,GEAR_SLOTS,GEAR_RARITIES,gearName,lootRoll,enhancementInfo,gearSellValue,cultivationCost,shopStock } from './GearData.js';
+import { GEAR_CAPACITY,GEAR_SLOTS,TAICHU_RARITY,gearName,lootRoll,enhancementInfo,gearSellValue,cultivationCost,shopStock } from './GearData.js';
 import { INTERACTABLES,distance } from './GameData.js';
 
 /** All transactions validate again at execution; UI labels are never authoritative. */
@@ -11,7 +11,7 @@ export class GameGear{
   changed(){this.revision++;this.state.recalculate();this.state.settleCappedBoons();this.state.saveDirty=true;}
   grant(spec,notify=true){
     const s=this.state;
-    if (!Object.hasOwn(GEAR_SLOTS,spec.slot) || !Number.isInteger(spec.rarity) || spec.rarity<0 || spec.rarity>2) return null;
+    if (!Object.hasOwn(GEAR_SLOTS,spec.slot) || !Number.isInteger(spec.rarity) || spec.rarity<0 || spec.rarity>TAICHU_RARITY) return null;
     if (s.save.gearBag.length >= GEAR_CAPACITY) {
       const protectedIds = new Set(Object.values(s.save.gearEquipped));
       let replace;
@@ -19,26 +19,45 @@ export class GameGear{
         if (protectedIds.has(item.uid) || item.locked || item.enhance || item.rarity >= spec.rarity) continue;
         if (!replace || item.rarity < replace.rarity || (item.rarity === replace.rarity && gearSellValue(item) < gearSellValue(replace))) replace = item;
       }
-      if (!replace) {
+      if (!replace && spec.rarity !== TAICHU_RARITY) {
         const value = gearSellValue({...spec, enhance: spec.enhance || 0});
         s.save.gold += value; s.saveDirty = true;
         s.emit('toast', {text: `行囊已满，新装备已回收为 ${value} 灵石。`});
         return null;
       }
-      this.sell(replace.uid);
+      if (replace) this.sell(replace.uid);
+      else s.emit('toast', {text:'行囊已满，太初装备已保留在行囊中。'});
     }
-    const item={uid:'g'+s.save.nextGearId++,slot:spec.slot,rarity:spec.rarity,level:Math.max(1,Math.min(50,Math.floor(spec.level||s.save.level))),enhance:Math.max(0,Math.min(20,Math.floor(spec.enhance||0)))};
+    const level = Number.isFinite(spec.level) ? spec.level : s.save.level;
+    const item={uid:'g'+s.save.nextGearId++,slot:spec.slot,rarity:spec.rarity,level:Math.max(1,Math.floor(level)),enhance:Math.max(0,Math.min(20,Math.floor(spec.enhance||0)))};
+    if (spec.rarity === TAICHU_RARITY || spec.locked) item.locked = true;
     if(item.slot==='weapon')item.weaponKind=weaponKind(spec,s.kind);
     s.save.gearBag.push(item);s.saveDirty=true;this.revision++;if(notify)s.emit('gearLoot',{item});return item;
   }
   drop(enemy){
-    const s=this.state,roll=lootRoll(enemy,()=>s.random(),s.save.gearPity);
-    if(!roll){s.save.gearPity++;return;}
-    s.save.gearPity=0;const level=Math.min(50,Math.max(1,(enemy.level||1)+s.save.challenge*3,Math.floor(s.save.level*.85)));
-    const spec={...roll,level,enhance:0};if(spec.slot==='weapon')spec.weaponKind=s.kind==='ice'?'bow':s.save.nextLootId%2?'dao':'jian';const ground=s.drops.filter(d=>d.alive&&d.gear);if(ground.length>=96){const oldest=ground[0];oldest.alive=false;s.save.gold+=gearSellValue(oldest.gear);s.emit('toast',{text:'散落装备较多，最早的装备已自动回收为灵石。'});}
-    const lootId=s.save.nextLootId++,motion=createLootMotion(enemy.x,enemy.z,lootId,roll.rarity);s.drops.push({lootId,x:enemy.x,z:enemy.z,age:0,alive:true,gear:spec,...motion});this.syncGround();s.emit('gearDrop',{lootId,x:enemy.x,y:motion.y,z:enemy.z,rarity:roll.rarity});
+    const s = this.state;
+    const roll = lootRoll(enemy, () => s.random(), s.save.gearPity, s.save.level);
+    if (!roll) { s.save.gearPity++; return; }
+    s.save.gearPity = 0;
+    const taichu = roll.rarity === TAICHU_RARITY;
+    const level = Math.max((enemy.level || 1) + s.save.challenge * 3, Math.floor(s.save.level * (taichu ? 1 : .85)));
+    const gear = {...roll, level, enhance:0};
+    if (gear.slot === 'weapon') gear.weaponKind = s.kind === 'ice' ? 'bow' : s.save.nextLootId % 2 ? 'dao' : 'jian';
+    const ground = s.drops.filter(d => d.alive && d.gear);
+    if (ground.length >= 96) {
+      const oldest = ground.reduce((least, drop) => drop.gear.rarity < least.gear.rarity ? drop : least);
+      oldest.alive = false;
+      if (oldest.gear.rarity === TAICHU_RARITY) this.grant(oldest.gear);
+      else s.save.gold += gearSellValue(oldest.gear);
+      s.emit('toast', {text:'散落装备较多，已结算一件地面装备。'});
+    }
+    const lootId = s.save.nextLootId++;
+    const motion = createLootMotion(enemy.x, enemy.z, lootId, roll.rarity);
+    s.drops.push({lootId, x:enemy.x, z:enemy.z, age:0, alive:true, gear, ...motion});
+    this.syncGround();
+    s.emit('gearDrop', {lootId, x:enemy.x, y:motion.y, z:enemy.z, rarity:roll.rarity, gear});
   }
-  syncGround(dirty=true){const s=this.state;s.save.groundGear=s.drops.filter(d=>d.alive&&d.gear).slice(0,96).map(d=>({lootId:d.lootId,x:d.x,z:d.z,age:d.age,birthX:d.birthX,birthZ:d.birthZ,landX:d.landX,landZ:d.landZ,flight:d.flight,arc:d.arc,landed:d.landed,seed:d.seed,gear:{...d.gear}}));if(dirty)s.saveDirty=true;}
+  syncGround(dirty=true){const s=this.state;s.save.groundGear=s.drops.filter(d=>d.alive&&d.gear).slice(0,96).map(d=>({...serializeLootMotion(d),gear:{...d.gear}}));if(dirty)s.saveDirty=true;}
   equip(uid){const item=this.find(uid);if(!item||this.state.dead)return false;this.state.save.gearEquipped[item.slot]=uid;this.changed();this.state.emit('gearEquipped',{item});return true;}
   unequip(slot){if(!Object.hasOwn(GEAR_SLOTS,slot)||!this.state.save.gearEquipped[slot])return false;delete this.state.save.gearEquipped[slot];this.changed();return true;}
   toggleLock(uid) {
@@ -50,12 +69,49 @@ export class GameGear{
     this.state.saveDirty = true;
     return true;
   }
-  sell(uid){const item=this.find(uid),s=this.state;if(!item||item.locked||Object.values(s.save.gearEquipped).includes(uid))return false;s.save.gold+=gearSellValue(item);s.save.gearBag.splice(s.save.gearBag.indexOf(item),1);s.saveDirty=true;this.revision++;s.emit('toast',{text:`已回收 ${gearName(item)}，获得 ${gearSellValue(item)} 灵石。`});return true;}
+  canSell(item) {
+    return !!item && !this.state.dead && !item.locked && this.state.save.gearEquipped[item.slot] !== item.uid;
+  }
+  saleQuote(ids) {
+    const requested = new Set(ids);
+    const items = this.state.save.gearBag.filter(item => requested.has(item.uid) && this.canSell(item));
+    return {items, value: items.reduce((total, item) => total + gearSellValue(item), 0)};
+  }
+  sellMany(ids) {
+    const s = this.state, quote = this.saleQuote(ids);
+    if (!quote.items.length) return quote;
+    const sold = new Set(quote.items.map(item => item.uid));
+    s.save.gearBag = s.save.gearBag.filter(item => !sold.has(item.uid));
+    s.save.gold += quote.value;
+    s.saveDirty = true;
+    this.revision++;
+    const subject = quote.items.length === 1 ? gearName(quote.items[0]) : `${quote.items.length} 件装备`;
+    s.emit('toast', {text: `已出售 ${subject}，获得 ${quote.value.toLocaleString()} 灵石。`});
+    return quote;
+  }
+  sell(uid) { return this.sellMany([uid]).items.length === 1; }
   enhance(uid){
     const item=this.find(uid),s=this.state;if(!item||!this.canTrade())return {ok:false,reason:'请在安全的灯台附近强化。'};
     const info=enhancementInfo(item);if(info.max)return {ok:false,reason:'已达到 +20 强化上限。'};if(s.save.gold<info.cost)return {ok:false,reason:'灵石不足。'};
     s.save.gold-=info.cost;const success=s.random()<info.chance;if(success)item.enhance++;this.changed();s.emit('gearEnhanced',{item,success,cost:info.cost});
     return {ok:true,success,level:item.enhance,cost:info.cost};
+  }
+  inheritanceTargets(source) {
+    if (source?.rarity !== TAICHU_RARITY || source.enhance <= 0) return [];
+    return this.state.save.gearBag.filter(target => target.rarity === TAICHU_RARITY &&
+      target.slot === source.slot && target.level > source.level && target.enhance === 0);
+  }
+  inherit(sourceId, targetId) {
+    if (!this.canTrade()) return {ok:false,reason:'请在安全的灯台附近继承。'};
+    const source = this.find(sourceId), target = this.find(targetId);
+    if (!this.inheritanceTargets(source).includes(target)) {
+      return {ok:false,reason:'请选择同部位的两件太初装备。承接装备等级须更高，且强化为 +0。'};
+    }
+    const rank = source.enhance;
+    source.enhance = 0;
+    target.enhance = rank;
+    this.changed();
+    return {ok:true,source,target,rank};
   }
   refreshStock(){const s=this.state,epoch=Math.min(1000000,s.save.challenge*1000+Math.floor(s.save.playTime/300));if(epoch>s.save.shopEpoch){s.save.shopEpoch=epoch;s.save.shopBought=[];s.saveDirty=true;}}
   stock(){this.refreshStock();return shopStock(this.state.save);}

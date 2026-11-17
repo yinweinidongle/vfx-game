@@ -1,0 +1,43 @@
+{
+  "armor-taichu": {
+    "sourceTriangles": 999984,
+    "triangles": 7000
+  },
+  "boots-taichu": {
+    "sourceTriangles": 999974,
+    "triangles": 7000
+  },
+  "wings-taichu": {
+    "sourceTriangles": 997112,
+    "triangles": 7998
+  },
+  "cloak-taichu": {
+    "sourceTriangles": 999862,
+    "triangles": 7000
+  },
+  "dao-taichu": {
+    "sourceTriangles": 609309,
+    "triangles": 7000
+  },
+  "jian-taichu": {
+    "sourceTriangles": 335454,
+    "triangles": 7000
+  },
+  "bow-taichu": {
+    "sourceTriangles": 442028,
+    "triangles": 7000,
+    "gearFit": {
+      "lower": [
+        0,
+        -0.4966770112514496,
+        -0.14696400985121727
+      ],
+      "upper": [
+        0,
+        0.4964219927787781,
+        -0.14696400985121727
+      ],
+      "removedStringTriangles": 51748
+    }
+  }
+}

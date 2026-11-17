@@ -10,8 +10,11 @@ import { sampleWorldCycle } from './WorldCycle.js';
 import { GameAwakening } from './GameAwakening.js';
 import { AWAKENING_RANGE } from './AwakeningConfig.js';
 import { vitalityGrowth, spiritGrowth, skillColor } from './CultivationGrowth.js';
-import { readGearSave, equippedGearStats } from './GearData.js';
+import { readGearSave, equippedGearStats, TAICHU_SET_SIZE } from './GearData.js';
 import { GameGear } from './GameGear.js';
+import { GameTaichuSet } from './GameTaichuSet.js';
+import { damageThroughDefense, levelsEarned, TAICHU_UNLOCK_LEVEL } from './Progression.js';
+import { cleanGroundStones, dropSpiritStones, groundStones } from './SpiritStones.js';
 
 const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0, trackedChapter: 0, gearBag:[],gearEquipped:{},nextGearId:1,gearPity:0,shopEpoch:0,shopBought:[],groundGear:[],nextLootId:1 });
 export function readSave(storage,key=SAVE_KEY) {
@@ -20,10 +23,10 @@ export function readSave(storage,key=SAVE_KEY) {
     if (s?.version !== 1 || !Object.hasOwn(CLASSES, s.kind)) return null;
     const d = fresh(s.kind);
     const numeric = (value, min, max) => Number.isFinite(Number(value)) ? clamp(Number(value), min, max) : min;
-    d.level = Math.floor(numeric(s.level, 1, 50));
-    for (const key of ['xp', 'gold', 'kills', 'deaths', 'challenge']) d[key] = Math.floor(numeric(s[key], 0, key === 'gold' ? 1e9 : 1e7));
+    d.level = Math.floor(numeric(s.level, 1, Number.MAX_SAFE_INTEGER));
+    for (const key of ['xp', 'gold', 'kills', 'deaths', 'challenge']) d[key] = Math.floor(numeric(s[key], 0, Number.MAX_SAFE_INTEGER));
     d.playTime = numeric(s.playTime, 0, Number.MAX_SAFE_INTEGER);
-    d.pendingBoons = Math.floor(numeric(s.pendingBoons, 0, 50));
+    d.pendingBoons = Math.floor(numeric(s.pendingBoons, 0, BOONS.length * MAX_FERVOR));
     d.trackedChapter = Math.floor(numeric(s.trackedChapter, 0, REGIONS.length));
     if (Number.isInteger(s.rng) && s.rng >= 0 && s.rng <= 0xffffffff) d.rng = s.rng;
     d.won = s.won === true;
@@ -37,6 +40,8 @@ export function readSave(storage,key=SAVE_KEY) {
     for (const b of BOONS) d.boons[b.id] = clamp(Math.floor(Number(s.boons?.[b.id]) || 0), 0, 50);
     if (INTERACTABLES.some(i => i.type === 'camp' && i.id === s.checkpoint)) d.checkpoint = s.checkpoint;
     readGearSave(s,d);
+    d.groundStones = cleanGroundStones(s.groundStones, new Set(d.groundGear.map(drop => drop.lootId)));
+    for (const drop of d.groundStones) d.nextLootId = Math.max(d.nextLootId, drop.lootId + 1);
     return d;
   } catch { return null; }
 }
@@ -49,8 +54,11 @@ export class GameState {
     this.time = 0; this.events = []; this.enemies = []; this.obstacles = [];
     this.projectiles = Array.from({ length: 96 }, (_, id) => ({ id, alive: false, hit: new Set() }));
     this.zones = Array.from({ length: 24 }, () => ({ alive: false }));
-    this.haloVolley=new GameHaloVolley(this);this.fervorVolley=new GameFervorVolley(this);this.awakening=new GameAwakening(this);this.lockedTarget=null;
-    this.drops = (this.save.groundGear||[]).filter(d=>isLand(d.x,d.z,.1)).map(d=>({...d,gear:{...d.gear},alive:true}));this.save.nextLootId ||= 1;this.save.groundGear ||= [];this.pendingBoons = this.save.pendingBoons || 0; this.started = new Set(this.save.cleared);
+    this.haloVolley=new GameHaloVolley(this);this.fervorVolley=new GameFervorVolley(this);this.awakening=new GameAwakening(this);this.taichuSet=new GameTaichuSet(this);this.lockedTarget=null;
+    this.drops = [...(this.save.groundGear || []), ...(this.save.groundStones || [])]
+      .filter(d => isLand(d.x,d.z,.1))
+      .map(d => ({...d, ...(d.gear ? {gear:{...d.gear}} : {}), alive:true}));
+    this.save.nextLootId ||= 1;this.save.groundGear ||= [];this.pendingBoons = this.save.pendingBoons || 0; this.started = new Set(this.save.cleared);
     this.encounters = new EncounterDirector(this);
     this.player = { x: -28, z: 22, yaw: 0, hp: 1, energy: 100, stamina: 100, invulnerable: 0, action: 'idle', actionTime: 0, cooldowns: SKILLS.map(()=>0), attackCooldown: 0, potion: 0, combat: 0, dash: 0, dashX: 0, dashZ: 0, combo: 0 };
     const camp = INTERACTABLES.find(i => i.id === this.save.checkpoint); this.player.x = camp.x; this.player.z = camp.z - 3;
@@ -62,7 +70,7 @@ export class GameState {
   random() { this.rng = (Math.imul(1664525, this.rng) + 1013904223) >>> 0; return this.rng / 4294967296; }
   emit(type, detail = {}) { this.events.push({ ...detail, type }); }
   recalculate() {
-    const previous = this.growth,oldShield=this.vitality,oldSpirit=this.spirit;
+    const previous = this.growth,oldShield=this.vitality,oldSpirit=this.spirit,oldStats=this.stats;
     this.vitality=vitalityGrowth(this.save.boons.vitality);this.spirit=spiritGrowth(this.save.boons.spirit);
     this.stats=this.statsFor();this.growth=attackGrowth(this.kind,this.stats.damage,CLASSES[this.kind].damage,this.save.boons.power);
     this.player.shield=Math.min(this.vitality.capacity,(this.player.shield||0)+Math.max(0,this.vitality.capacity-(oldShield?.capacity||0)));
@@ -70,17 +78,31 @@ export class GameState {
     this.player.hp=Math.min(this.player.hp,this.stats.hp);
     if(oldShield&&this.vitality.level>oldShield.level)this.emit('vitalityUpgrade',{text:`长生 ${this.vitality.level} 层 · 护罩可吸收 ${this.vitality.capacity} 点伤害`});
     if(oldSpirit&&this.spirit.level>oldSpirit.level)this.emit('spiritUpgrade',{text:`灵息 ${this.spirit.level} 层 · ${this.spirit.name} · 灵力上限 ${this.stats.energyMax}`});
+    if(oldStats&&!oldStats.taichu&&this.stats.taichu)this.emit('taichuSet',{text:'太初五件套 · 攻击 +100% · 行生幻影 · 攻击有 5% 概率引落陨星'});
     if (previous && this.growth.tier > previous.tier) this.emit('ascend', { ...this.growth, x: this.player.x, z: this.player.z, text: `攻势觉醒 · ${this.growth.name} · ${this.growth.shots} 重追击` });
     if(previous&&this.growth.stacks>previous.stacks)this.emit('fervorUpgrade',{from:previous.stacks,stacks:this.growth.stacks,finishTier:this.growth.finishTier,text:`锋芒 ${this.growth.stacks} 层 · 新增一枚${this.growth.spiritName} · ${this.growth.echoes} 道追击${this.growth.finishTier>previous.finishTier?' · 终结爆发进阶':''}`});
   }
-  attackBase() { return CLASSES[this.kind].damage + equippedGearStats(this.save).damage; }
+  attackBase() { return this.stats.attackBase; }
   statsFor(equipment=this.save.equipment,gearEquipped=this.save.gearEquipped) {
     const c = CLASSES[this.kind], b = this.save.boons, items = Object.values(equipment).map(id => ITEMS[id]).filter(Boolean);
     const sum = k => items.reduce((n, i) => n + (i[k] || 0), 0);
     const spirit=spiritGrowth(b.spirit),gear=equippedGearStats(this.save,gearEquipped);
-    return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality')+gear.hp, damage: (c.damage+gear.damage) * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier+gear.regen, energyMax:spirit.energyMax+gear.energyMax, speed: c.speed*(1+Math.min(.65,gear.speed)),attackSpeed:1+Math.min(1.4,gear.attackSpeed) };
+    const taichu=gear.taichuCount===TAICHU_SET_SIZE,attackBase=(c.damage+gear.damage)*(taichu?2:1);
+    return { hp: c.hp + (this.save.level - 1) * 14 + b.vitality * 35 + sum('vitality')+gear.hp, damage: attackBase * (1 + b.power * .12 + sum('power') + (this.save.level - 1) * .10), attackBase, taichu, taichuCount:gear.taichuCount, crit: Math.min(.7, .08 + sum('crit') + (this.kind === 'ice' ? .1 : 0)), haste: Math.min(.55, sum('haste') + b.spirit * .05), regen: (this.kind === 'cultivator' ? 2.8 : 2.2) * spirit.regenMultiplier+gear.regen, energyMax:spirit.energyMax+gear.energyMax, speed: c.speed*(1+Math.min(.65,gear.speed)),attackSpeed:1+Math.min(1.4,gear.attackSpeed) };
   }
-  write(storage) { try { this.gear.syncGround(false);this.save.rng=this.rng;storage.setItem(SAVE_KEY, JSON.stringify(this.save)); this.saveDirty = false; return true; } catch { this.emit('toast', { text: '浏览器无法保存进度，请检查存储空间。' }); return false; } }
+  write(storage) {
+    try {
+      this.gear.syncGround(false);
+      this.save.groundStones = groundStones(this.drops);
+      this.save.rng = this.rng;
+      storage.setItem(SAVE_KEY, JSON.stringify(this.save));
+      this.saveDirty = false;
+      return true;
+    } catch {
+      this.emit('toast', {text:'浏览器无法保存进度，请检查存储空间。'});
+      return false;
+    }
+  }
   trackBounty(chapter) {
     const region = REGIONS[chapter - 1];
     const progress = region && bountyProgress(this.save, region);
@@ -146,7 +168,8 @@ export class GameState {
     const p = this.player; if (this.dead || p.attackCooldown > 0 || p.dash > 0 || (this.awakening.active&&this.awakening.age<.5)) return false;
     const target=this.aimTarget(aimX,aimZ,24),yaw=Math.atan2((target?.x??aimX)-p.x,(target?.z??aimZ)-p.z);this.lockedTarget=target;p.yaw=yaw;p.combo=(p.combo+1)%3;
     p.action = 'attack'; p.actionTime = 0; p.attackCooldown = (this.kind === 'sword' ? .48 : .55) / ((1 + this.growth.tier * .045)*this.stats.attackSpeed);
-    this.volley(this.kind==='sword'?'slash':this.kind==='ice'?'arrow':'spirit',target,yaw,this.stats.damage*(this.kind==='sword'&&p.combo===0?1.2:1),true);
+    const launched=this.volley(this.kind==='sword'?'slash':this.kind==='ice'?'arrow':'spirit',target,yaw,this.stats.damage*(this.kind==='sword'&&p.combo===0?1.2:1),true);
+    if(launched>0)this.taichuSet.request(target);
     this.fervorVolley.request(target);
     this.emit('attack', { kind: this.kind, tier:this.growth.tier, color:this.growth.color }); return true;
   }
@@ -192,6 +215,7 @@ export class GameState {
       this.haloVolley.begin(event,this.growth.haloCount+this.spirit.haloBonus,this.stats.damage*(.12+this.growth.tier*.015)*this.spirit.damage);
       this.emit('divine',event);
     }
+    this.taichuSet.request(target,index>=3?.50:0);
     this.fervorVolley.request(target);this.emit('cast', { index,spiritLevel:this.spirit.level,skillStage:this.spirit.stage,skillAccent:this.spirit.accent }); return true;
   }
   dodge(dx, dz) {
@@ -207,7 +231,8 @@ export class GameState {
   }
   hit(enemy, amount, element, style=null) {
     if (enemy.hp <= 0) return;
-    const critical = this.random() < this.stats.crit, damage = Math.round(amount * (critical ? 1.75 : 1));
+    const critical = this.random() < this.stats.crit;
+    const damage = Math.max(1, Math.round(damageThroughDefense(amount * (critical ? 1.75 : 1), enemy.defense)));
     enemy.hp = Math.max(0, enemy.hp - damage); enemy.flash = .15;
     if (element === 'frost') enemy.frozen = enemy.type === 'boss' ? .35 : enemy.elite ? .7 : 1.65;
     else if (enemy.type !== 'boss' && !enemy.elite) enemy.stagger = .16;
@@ -218,8 +243,11 @@ export class GameState {
     if(style?.primary&&!style.echo&&!style.fervor&&this.time-this.player.energyHitAt>=.45){this.player.energy=Math.min(this.stats.energyMax,this.player.energy+1);this.player.energyHitAt=this.time;}
     this.emit('hit', { x: enemy.x, z: enemy.z, damage, critical, element, scale: enemy.scale,enemyId:enemy.id,primary:style?.primary,color:style?.color,radiance:style?.radiance,tier:style?.tier??this.growth.tier,echo:style?.echo,fervor:style?.fervor,finisher:style?.finisher,finishTier:style?.finishTier,finishRadius:style?.finishRadius,fervorSplash:style?.fervorSplash,spiritLevel:style?.spiritLevel||0,skillStage:style?.skillStage||0,skillAccent:style?.skillAccent });
     if (enemy.hp === 0) {
-      enemy.state = 'dead'; this.save.kills++; this.save.gold += enemy.type === 'boss' ? 200 : Math.round(enemy.xp * .45); this.gainXP(enemy.xp);
-      this.drops.push({ x: enemy.x, z: enemy.z, age: 0, alive: true });this.gear.drop(enemy); this.emit('death', { enemy });
+      enemy.state = 'dead'; this.save.kills++; this.gainXP(enemy.xp);
+      this.drops.push({x:enemy.x, z:enemy.z, age:0, alive:true});
+      this.gear.drop(enemy);
+      dropSpiritStones(this, enemy);
+      this.emit('death', {enemy});
       this.encounters.onDeath(enemy);
       this.saveDirty = true;
     }
@@ -230,13 +258,35 @@ export class GameState {
     p.hp = Math.max(0, p.hp - (damage-absorbed)); p.invulnerable = .4; p.combat = 5;
     if(absorbed>0){const dx=(source?.x??p.x+Math.sin(p.yaw))-p.x,dz=(source?.z??p.z+Math.cos(p.yaw))-p.z,len=Math.hypot(dx,dz)||1;this.emit('shieldHit',{absorbed,broken:p.shield<=0,nx:dx/len,nz:dz/len});}
     if(damage>absorbed){p.hurtFlash=.12;this.emit('hurt', { damage:damage-absorbed, x: p.x, z: p.z });}
-    if (p.hp <= 0) { this.dead = true; this.save.deaths++; this.emit('defeat'); this.saveDirty = true; }
+    if (p.hp <= 0) { this.dead = true; this.taichuSet.reset(); this.save.deaths++; this.emit('defeat'); this.saveDirty = true; }
   }
   gainXP(xp) {
-    this.save.xp += xp;
-    while (this.save.level < 50 && this.save.xp >= this.save.level * 95) { this.save.xp -= this.save.level * 95; this.save.level++; this.pendingBoons++; this.save.pendingBoons=this.pendingBoons; this.saveDirty=true; this.recalculate(); if (!this.dead) this.player.hp = this.stats.hp; this.emit('level');const unlocked=SKILLS.find(k=>k.unlockLevel===this.save.level);if(unlocked)this.emit('awakeningUnlocked',{text:`觉醒已至 · ${unlocked.key} · ${unlocked.name} 已解锁。`}); }
+    if (!(xp > 0) || !Number.isFinite(xp)) return;
+    const before = this.save.level;
+    const progress = levelsEarned(before, Math.min(Number.MAX_SAFE_INTEGER, this.save.xp + Math.floor(xp)));
+    this.save.xp = progress.remaining;
+    this.saveDirty = true;
+    if (!progress.levels) return;
+    const available = BOONS.reduce((count, boon) => count + MAX_FERVOR - this.save.boons[boon.id], 0);
+    this.save.level += progress.levels;
+    this.pendingBoons += progress.levels;
     this.settleCappedBoons();
-    if (this.save.level === 50) this.save.xp = Math.min(this.save.xp, 50 * 95);
+    if (this.pendingBoons > available) {
+      this.save.gold += (this.pendingBoons - available) * 120;
+      this.pendingBoons = available;
+    }
+    this.save.pendingBoons = this.pendingBoons;
+    this.recalculate();
+    if (!this.dead) this.player.hp = this.stats.hp;
+    this.emit('level', {levels:progress.levels});
+    for (const skill of SKILLS) {
+      if (skill.unlockLevel > before && skill.unlockLevel <= this.save.level) {
+        this.emit('awakeningUnlocked', {text:`觉醒已至 · ${skill.key} · ${skill.name} 已解锁。`});
+      }
+    }
+    if (before < TAICHU_UNLOCK_LEVEL && this.save.level >= TAICHU_UNLOCK_LEVEL) {
+      this.emit('toast', {text:'太初寻宝已开启 · 击败敌人有极低概率获得太初装备。'});
+    }
   }
   settleCappedBoons() {
     if (!this.pendingBoons || BOONS.some(b => this.save.boons[b.id] < MAX_FERVOR)) return;
@@ -287,10 +337,12 @@ export class GameState {
     if (!this.save.won || !this.gear.canTrade()) return null;
     const progress = structuredClone(this.save);
     Object.assign(progress, {challenge: progress.challenge + 1, won: false, seals: [false, false],
-      cleared: [], opened: [], trackedChapter: 0, checkpoint: 'camp', groundGear: [], rng: this.rng});
+      cleared: [], opened: [], trackedChapter: 0, checkpoint: 'camp', groundGear: [], groundStones: [], rng: this.rng});
     const next = new GameState(this.kind, progress);
     for (const drop of this.drops) {
-      if (drop.alive && drop.gear) next.gear.grant(drop.gear, false);
+      if (!drop.alive) continue;
+      if (drop.gear) next.gear.grant(drop.gear, false);
+      if (drop.stones) next.save.gold += drop.stones;
     }
     return next;
   }
@@ -300,7 +352,7 @@ export class GameState {
     p.dash=0;p.action='idle';p.actionTime=0;p.cooldowns.fill(0);p.attackCooldown=p.potion=0;this.awakening.reset();
     for (const e of this.enemies) if (e.hp > 0) { e.x=e.homeX;e.z=e.homeZ;e.hp=e.maxHp;e.frozen=e.stagger=0;e.state = 'chase'; e.timer = 1.5; }
     for (const p of this.projectiles) p.alive = false; for (const z of this.zones) z.alive = false;
-    this.haloVolley.reset();this.fervorVolley.reset();this.lockedTarget=null;
+    this.haloVolley.reset();this.fervorVolley.reset();this.taichuSet.reset();this.lockedTarget=null;
     this.emit('revive');
   }
   update(dt, input) {
@@ -324,7 +376,7 @@ export class GameState {
     p.vx=dt>0?(p.x-lastX)/dt:0;p.vz=dt>0?(p.z-lastZ)/dt:0;
     const zone = zoneAt(p.x, p.z); if (zone.id !== this.lastZone) { this.lastZone = zone.id; this.emit('region', { zone }); }
     this.encounters.update(dt);
-    this.updateEnemies(dt); this.updateProjectiles(dt);this.haloVolley.update(dt);this.fervorVolley.update();this.awakening.update(dt);
+    this.updateEnemies(dt); this.updateProjectiles(dt);this.haloVolley.update(dt);this.fervorVolley.update();this.awakening.update(dt);this.taichuSet.update();
     for (const z of this.zones) if (z.alive) {
       z.age += dt;
       if (z.age >= z.tick) {
@@ -336,6 +388,12 @@ export class GameState {
     }
     for (const d of this.drops) if (d.alive) {
       d.age += dt;
+      if (d.stones) {
+        advanceLoot(d, dt, p, .10);
+        if (d.landed && d.age > d.flight + .10 && distance(d, p) < .85) this.collectStones(d);
+        else if (d.age > 60) this.collectStones(d, true);
+        continue;
+      }
       if(d.gear){if(advanceLoot(d,dt,p))this.emit('gearLand',{lootId:d.lootId,x:d.x,y:d.y,z:d.z,rarity:d.gear.rarity});}
       const len = distance(d, p);
       if (!d.gear&&len < 7) { const t = Math.min(1, dt * (2 + d.age * 2)); d.x += (p.x - d.x) * t; d.z += (p.z - d.z) * t; }
@@ -348,6 +406,13 @@ export class GameState {
       const d = distance(p, o); if (d < best) { best = d; near = o; }
     }
     this.nearby = near;
+  }
+  collectStones(drop, banked = false) {
+    if (!drop.alive || !drop.stones) return;
+    drop.alive = false;
+    this.save.gold += drop.stones;
+    this.saveDirty = true;
+    this.emit('stonePickup', {amount:drop.stones, x:drop.x, z:drop.z, banked});
   }
   updateEnemies(dt) {
     const p = this.player;

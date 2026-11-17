@@ -2,8 +2,8 @@ import * as T from 'three';
 import { heightAt } from './GameData.js';
 
 const CAPACITY = 32;
-const REACH = [1.45, 3.7, 7.6];
-const LIFE = [.34, .55, .79];
+const REACH = [1.45, 3.7, 7.6, 9.0];
+const LIFE = [.34, .55, .79, .82];
 // Azimuth, elevation, reach, half-width, minimum quality. The foreground fan,
 // upright lance and lateral counter-stroke are deliberately different shapes.
 const RAYS = [
@@ -13,6 +13,8 @@ const RAYS = [
   [-2.16, .78, .51, .009, 1], [2.52, .06, .85, .007, 2],
   [.84, .04, .79, .009, 2], [-1.32, .72, .66, .006, 2],
   [3.03, .03, .43, .008, 2], [.22, 1.13, .46, .010, 2],
+  [-.67,.38,1.17,.027,3], [1.18,.08,1.08,.021,3],
+  [2.76,.16,.82,.039,3], [1.68,.69,.92,.014,3],
 ];
 const declarations = `
   attribute vec4 aCue;
@@ -23,8 +25,10 @@ const declarations = `
 const palette = `
   varying vec2 vUV;
   varying float vAge, vTier, vLand, vSeed;
-  vec3 edgeColor(){return vTier<.5?vec3(.78,.89,1.):vTier<1.5?vec3(.47,.07,1.):vec3(1.,.25,.009);}
-  vec3 heartColor(){return vTier<.5?vec3(1.):vTier<1.5?vec3(.99,.82,1.):vec3(1.,.95,.68);}
+  vec3 edgeColor(){return vTier>2.5?vec3(.02,.84,.62):vTier<.5?vec3(.78,.89,1.):vTier<1.5?vec3(.47,.07,1.):vec3(1.,.25,.009);}
+  vec3 heartColor(){return vTier>2.5?vec3(.65,1.,.86):vTier<.5?vec3(1.):vTier<1.5?vec3(.99,.82,1.):vec3(1.,.95,.68);}
+  float glint(float center,float width){float t=(vAge-center)/width;return exp(-t*t);}
+  float flash(float offset){return .68+.62*glint(.11+offset,.075)+.86*glint(.49-offset,.063);}
 `;
 
 function rayGeometry() {
@@ -57,7 +61,7 @@ const rayVertex = declarations + `
     float elevation=aShape.y;
     vec3 dir=vec3(cos(angle)*cos(elevation),sin(elevation),sin(angle)*cos(elevation));
     float extend=1.-pow(1.-clamp((vAge+.015)/.20,0.,1.),3.);
-    float tail=smoothstep(.23,.76,vAge)*.62;
+    float tail=vTier>2.5?smoothstep(.56,.94,vAge)*.34:smoothstep(.23,.76,vAge)*.62;
     float along=mix(tail,1.,uv.y)*extend*aShape.z;
     vec4 center=modelViewMatrix*instanceMatrix*vec4(dir*along,1.);
     vec3 axis=mat3(modelViewMatrix*instanceMatrix)*dir;
@@ -65,7 +69,7 @@ const rayVertex = declarations + `
     float profile=(.045+.955*smoothstep(0.,.52,uv.y))*(1.-smoothstep(.63,1.,uv.y));
     float coreWidth=aShape.w*(vTier<.5?.48:vTier<1.5?.78:1.)*mix(1.,.48,smoothstep(.18,.70,vAge));
     center.xy+=side*position.x*reach*coreWidth*profile;
-    vGain=(1.-smoothstep(.16,.72,vAge))*step(aGrade-.1,vTier)*mix(1.,.65,vLand);
+    vGain=(1.-smoothstep(.16,vTier>2.5?.93:.72,vAge))*step(aGrade-.1,vTier)*mix(1.,.65,vLand);
     gl_Position=projectionMatrix*center;
   }
 `;
@@ -76,11 +80,12 @@ const rayFragment = palette + `
     float edge=1.-smoothstep(.42,1.,x);
     float spine=(1.-smoothstep(.025,.19,x))*(1.-vUV.y*.24);
     float split=exp(-abs(vUV.x-.62)*19.)*smoothstep(.05,.25,vUV.y);
-    float opacity=vGain*(edge*.97+split*.30)*(1.-smoothstep(.84,1.,vUV.y));
+    float twinkle=flash((fract(vSeed*.4+vUV.y*.25)-.5)*.06);
+    float opacity=min(1.,vGain*(edge*.97+split*.30)*(1.-smoothstep(.84,1.,vUV.y))*mix(1.,twinkle,step(2.5,vTier)));
     if(opacity<.008) discard;
-    vec3 body=vTier>1.5?vec3(2.8,1.36,.033):vTier>.5?vec3(1.65,.42,2.8):vec3(1.9,2.,2.18);
+    vec3 body=vTier>2.5?vec3(.11,2.25,1.87):vTier>1.5?vec3(2.8,1.36,.033):vTier>.5?vec3(1.65,.42,2.8):vec3(1.9,2.,2.18);
     vec3 color=mix(edgeColor()*1.05,body,1.-smoothstep(.32,.84,x));
-    color=mix(color,heartColor()*3.3,spine);
+    color=mix(color,heartColor()*mix(3.3,4.9+.85*twinkle,step(2.5,vTier)),spine);
     gl_FragColor=vec4(color,opacity);
   }
 `;
@@ -102,9 +107,9 @@ const coreFragment = palette + `
     float pins=(exp(-abs(p.x)*95.)*pow(max(0.,1.-abs(p.y)),2.)+exp(-abs(p.y)*116.)*pow(max(0.,1.-abs(p.x)),3.));
     float veil=exp(-r*r*14.)*.21;
     float hot=diamond*2.+pins*.62;
-    float gain=(veil+hot)*(first+echo);
+    float gain=(veil+hot)*(vTier>2.5?(.74*first+.55*glint(.49,.064)+.24*glint(.71,.052)):first+echo);
     if(gain<.008)discard;
-    gl_FragColor=vec4(mix(edgeColor()*1.9,heartColor()*3.4,clamp(hot,0.,1.)),gain);
+    gl_FragColor=vec4(mix(edgeColor()*1.9,heartColor()*(vTier>2.5?5.0:3.4),clamp(hot,0.,1.)),gain);
   }
 `;
 const groundVertex = declarations + `
@@ -185,9 +190,9 @@ export class LootFlare {
     this.layers[1].material.blending=T.NormalBlending;
     parent.add(...this.layers);
   }
-  emit(event) {
+  emit(event, drop = null) {
     const landed = event.type === 'gearLand';
-    const tier = T.MathUtils.clamp(Math.trunc(event.rarity) || 0, 0, 2);
+    const tier = T.MathUtils.clamp(Math.trunc(event.rarity) || 0, 0, REACH.length - 1);
     const nearby = this.pool.find(p => p.alive && p.landed === landed && p.age < .06 &&
       Math.hypot(p.x - event.x, p.z - event.z) < .85);
     if (nearby && nearby.tier >= tier) return;
@@ -204,19 +209,26 @@ export class LootFlare {
     const seed = ((event.lootId || 1) * .618033989 % 1) * Math.PI * 2;
     const heading = this.camera ? Math.atan2(this.camera.position.x - event.x, this.camera.position.z - event.z) : 0;
     Object.assign(slot, {alive: true, x: event.x, y, z: event.z, tier, landed, age: 0, seed, heading,
-      reach: REACH[tier] * (landed ? .32 : 1), life: LIFE[tier] * (landed ? .63 : 1)});
+      lootId:event.lootId, drop, reach: REACH[tier] * (landed ? .32 : 1), life: drop?.flight || LIFE[tier] * (landed ? .63 : 1)});
   }
 
-  update(dt) {
+  settle(lootId) {
+    for (const burst of this.pool) if (burst.alive && burst.lootId===lootId) { burst.alive=false; burst.drop=null; }
+  }
+
+  update(dt, presenting = false) {
     let count = 0;
     for (const burst of this.pool) {
       if (!burst.alive) continue;
-      burst.age += dt;
-      if (burst.age >= burst.life) {
+      const drop=burst.drop;
+      burst.age=drop ? drop.age : burst.age+dt;
+      if (burst.age >= burst.life || (drop && (!drop.alive || drop.landed))) {
         burst.alive = false;
+        burst.drop = null;
         continue;
       }
-      this.transform.position.set(burst.x, burst.y, burst.z);
+      if (drop && presenting) continue; // The cut-in has its own light; resume the world flare on release.
+      this.transform.position.set(drop?.x??burst.x, drop?.y??burst.y, drop?.z??burst.z);
       this.transform.rotation.set(0, burst.heading, 0);
       this.transform.scale.setScalar(burst.reach);
       this.transform.updateMatrix();

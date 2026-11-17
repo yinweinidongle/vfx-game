@@ -6,7 +6,7 @@ import {Group, PerspectiveCamera} from 'three';
 import {GameState, readSave} from '../src/game/GameState.js';
 import {ENCOUNTERS} from '../src/game/GameData.js';
 import {LootFlare} from '../src/game/LootFlare.js';
-import {LootSound, LOOT_SOUNDS} from '../src/game/LootSound.js';
+import {LootSound, LOOT_SOUNDS, FORGE_SOUNDS} from '../src/game/LootSound.js';
 
 const player = {x: 0, z: 0};
 const camera = new PerspectiveCamera();
@@ -78,8 +78,8 @@ test('same-site bursts keep the highest rarity, freeze their launch orientation 
   }
 });
 
-test('the shipped audio bank has six distinct audible non-clipping cues with silent boundaries', async () => {
-  const wav = await readFile('public/game/audio/loot/treasure-chimes-v1.wav');
+test('the shipped audio bank has ten distinct audible non-clipping cues with silent boundaries', async () => {
+  const wav = await readFile('public/game/audio/loot/treasure-chimes-v2.wav');
   assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
   assert.equal(wav.readUInt32LE(4), wav.length - 8);
   assert.equal(wav.toString('ascii', 8, 16), 'WAVEfmt ');
@@ -90,7 +90,8 @@ test('the shipped audio bank has six distinct audible non-clipping cues with sil
   assert.equal(wav.readUInt16LE(34), 16);
   const pcm = wav.subarray(44), hashes = new Set();
   let lastEnd = 0;
-  for (const cue of Object.values(LOOT_SOUNDS).flat()) {
+  const cues = [...Object.values(LOOT_SOUNDS).flat(), ...Object.values(FORGE_SOUNDS)].sort((a,b)=>a.offset-b.offset);
+  for (const cue of cues) {
     const start = Math.round(cue.offset * rate) * 2;
     const end = start + Math.floor(cue.length * rate) * 2;
     assert.ok(end <= pcm.length && start >= lastEnd);
@@ -109,7 +110,7 @@ test('the shipped audio bank has six distinct audible non-clipping cues with sil
     hashes.add(createHash('sha256').update(slice).digest('hex'));
     lastEnd = end;
   }
-  assert.equal(hashes.size, 6);
+  assert.equal(hashes.size, 10);
 });
 
 function audioHarness() {

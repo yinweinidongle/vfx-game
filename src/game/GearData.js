@@ -1,5 +1,7 @@
 import { cleanLootMotion } from './LootMotion.js';
-import { equipmentProfile,weaponKind } from './EquipmentCatalog.js';
+import { equipmentProfile, TAICHU_RARITY, weaponKind } from './EquipmentCatalog.js';
+export { TAICHU_RARITY } from './EquipmentCatalog.js';
+import { TAICHU_UNLOCK_LEVEL } from './Progression.js';
 /** Persistent, renderer-independent equipment rules. Values are never read from saved descriptions. */
 export const GEAR_CAPACITY=150;
 export const GEAR_SLOTS={
@@ -9,20 +11,22 @@ export const GEAR_SLOTS={
   cloak:{name:'披风',base:'归墟披风',stat:'回灵与灵力上限',asset:'cloak'},
   weapon:{name:'武器',base:'斩星灵兵',stat:'攻击力',asset:'weapon'},
 };
+export const TAICHU_SET_SIZE=Object.keys(GEAR_SLOTS).length;
 export const GEAR_RARITIES=[
   {name:'普通',prefix:'青霜',color:'#eef5ff',multiplier:1,value:1},
   {name:'稀有',prefix:'星渊',color:'#b482ff',multiplier:1.7,value:2.4},
-  {name:'史诗',prefix:'太初',color:'#ffcb66',multiplier:2.8,value:6},
+  {name:'史诗',prefix:'天工',color:'#ffcb66',multiplier:2.8,value:6},
+  {name:'太初',prefix:'太初',color:'#6be1c8',multiplier:4.4,value:20},
 ];
 const finite=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
 const int=(v,a,b)=>Math.max(a,Math.min(b,Math.floor(finite(v))));
 export function cleanGear(raw,kind){
   if(!raw||!/^g[1-9]\d{0,8}$/.test(raw.uid)||!Object.hasOwn(GEAR_SLOTS,raw.slot))return null;
-  return {uid:raw.uid,slot:raw.slot,rarity:int(raw.rarity,0,2),level:int(raw.level,1,50),enhance:int(raw.enhance,0,20),...(raw.locked===true?{locked:true}:{}),...(raw.slot==='weapon'?{weaponKind:weaponKind(raw,kind)}:{})};
+  return {uid:raw.uid,slot:raw.slot,rarity:int(raw.rarity,0,TAICHU_RARITY),level:int(raw.level,1,Number.MAX_SAFE_INTEGER),enhance:int(raw.enhance,0,20),...(raw.locked===true?{locked:true}:{}),...(raw.slot==='weapon'?{weaponKind:weaponKind(raw,kind)}:{})};
 }
 export function readGearSave(raw,target){
   const inputs=Array.isArray(raw.gearBag)?raw.gearBag:[],equipped=raw.gearEquipped,ground=raw.groundGear;const ids=new Set();target.gearBag=[];
-  for(const input of inputs){const g=cleanGear(input,raw.kind);if(g&&!ids.has(g.uid)&&target.gearBag.length<GEAR_CAPACITY){ids.add(g.uid);target.gearBag.push(g);}}
+  for(const input of inputs){const g=cleanGear(input,raw.kind);if(g&&!ids.has(g.uid)&&(target.gearBag.length<GEAR_CAPACITY||g.rarity===TAICHU_RARITY)){ids.add(g.uid);target.gearBag.push(g);}}
   target.gearEquipped={};for(const slot of Object.keys(GEAR_SLOTS)){const g=target.gearBag.find(g=>g.uid===equipped?.[slot]&&g.slot===slot);if(g)target.gearEquipped[slot]=g.uid;}
   target.nextGearId=Math.max(1,int(raw.nextGearId,1,99999999),...target.gearBag.map(g=>Number(g.uid.slice(1))+1));
   target.gearPity=int(raw.gearPity,0,11);
@@ -40,8 +44,13 @@ export function gearStats(g){
   return {damage:Math.round((6+l*1.7)*m)};
 }
 export function equippedGearStats(save,equipped=save.gearEquipped){
-  const total={hp:0,speed:0,attackSpeed:0,regen:0,energyMax:0,damage:0};
-  for(const slot of Object.keys(GEAR_SLOTS)){const g=(save.gearBag||[]).find(g=>g.uid===equipped?.[slot]&&g.slot===slot);if(g)for(const [key,n]of Object.entries(gearStats(g)))total[key]+=n;}
+  const total={hp:0,speed:0,attackSpeed:0,regen:0,energyMax:0,damage:0,taichuCount:0};
+  for(const slot of Object.keys(GEAR_SLOTS)){
+    const g=(save.gearBag||[]).find(g=>g.uid===equipped?.[slot]&&g.slot===slot);
+    if(!g)continue;
+    if(g.rarity===TAICHU_RARITY)total.taichuCount++;
+    for(const [key,n]of Object.entries(gearStats(g)))total[key]+=n;
+  }
   return total;
 }
 export function enhancementInfo(g){
@@ -49,22 +58,30 @@ export function enhancementInfo(g){
 }
 export const gearSellValue=g=>Math.round((15+g.level*4)*GEAR_RARITIES[g.rarity].value*(1+g.enhance*.12));
 export function enhancementStyle(level){
-  const stops=[[0,'#b9ecff',.12],[5,'#399bff',.5],[10,'#a561ff',.95],[15,'#ff3d65',1.45],[20,'#ffc85c',2.1]];
+  const stops=[[0,'#b9ecff',.10],[5,'#399bff',.75],[10,'#a561ff',1.45],[15,'#ff3d65',2.28],[20,'#ffc85c',3.35]];
   const n=int(level,0,20),index=Math.min(3,Math.floor(n/5)),t=(n-stops[index][0])/5;
-  return {from:stops[index][1],to:stops[index+1][1],mix:t,power:stops[index][2]+(stops[index+1][2]-stops[index][2])*t,tier:Math.floor(n/5)};
+  return {from:stops[index][1],to:stops[index+1][1],mix:t,power:stops[index][2]+(stops[index+1][2]-stops[index][2])*t,width:.105+n*.012,tier:Math.floor(n/5)};
 }
-export function lootRoll(enemy,random,misses=0){
+export function taichuDropChance(enemy) {
+  return enemy.type === 'boss' ? .0035 : enemy.elite ? .0008 : .00025;
+}
+export function lootRoll(enemy,random,misses=0,playerLevel=1){
+  const slots = Object.keys(GEAR_SLOTS);
+  const pickSlot = () => slots[Math.min(slots.length - 1, Math.floor(random() * slots.length))];
+  if (playerLevel >= TAICHU_UNLOCK_LEVEL && random() < taichuDropChance(enemy)) {
+    return {slot:pickSlot(), rarity:TAICHU_RARITY};
+  }
   const chance=enemy.type==='boss'?1:enemy.elite?.72:.28;
   if(misses<11&&random()>=chance)return null;
   const roll=random(),epic=enemy.type==='boss'?.18:enemy.elite?.09:.025,rare=enemy.type==='boss'?.34:enemy.elite?.29:.18;
-  return {slot:Object.keys(GEAR_SLOTS)[Math.min(4,Math.floor(random()*5))],rarity:roll<epic?2:roll<epic+rare?1:0};
+  return {slot:pickSlot(),rarity:roll<epic?2:roll<epic+rare?1:0};
 }
 export const cultivationCost=(id,n)=>Math.round((id==='power'?100:id==='vitality'?85:95)+n*(id==='power'?65:55));
 
 /** Stock is a pure function of character level and the persisted, five-minute stock epoch. */
 export function shopStock(save){
-  const stock=[];for(const slot of Object.keys(GEAR_SLOTS))for(let rarity=0;rarity<3;rarity++)for(const family of slot==='weapon'?(save.kind==='ice'?['bow']:['dao','jian']):['']){
-    const item={slot,rarity,level:Math.max(1,Math.min(50,save.level)),enhance:0,...(family?{weaponKind:family}:{})};
+  const stock=[];for(const slot of Object.keys(GEAR_SLOTS))for(let rarity=0;rarity<TAICHU_RARITY;rarity++)for(const family of slot==='weapon'?(save.kind==='ice'?['bow']:['dao','jian']):['']){
+    const item={slot,rarity,level:Math.max(1,save.level),enhance:0,...(family?{weaponKind:family}:{})};
     const id=`${save.shopEpoch||0}-${slot}-${rarity}${family?'-'+family:''}`;
     const bought=save.shopBought||[],legacyId=`${save.shopEpoch||0}-${slot}-${rarity}`;
     stock.push({...item,stockId:id,sold:bought.includes(id)||(family!=='jian'&&bought.includes(legacyId)),price:Math.round((60+save.level*10)*GEAR_RARITIES[rarity].value*(rarity===2?1.8:1))});

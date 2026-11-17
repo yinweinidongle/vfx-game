@@ -1,9 +1,9 @@
 import {mkdir,writeFile} from 'node:fs/promises';
-import {LOOT_SOUNDS} from '../src/game/LootSound.js';
+import {FORGE_SOUNDS, LOOT_SOUNDS} from '../src/game/LootSound.js';
 
 // Original modal percussion. A short clasp, a two-note jade chime, and a bronze
 // bell with ascending gold chimes. Each has a separate, lighter landing answer.
-const sampleRate=32000, wave=new Float64Array(Math.ceil(3.86*sampleRate));
+const sampleRate=32000, wave=new Float64Array(Math.ceil(8.12*sampleRate));
 const tau=2*Math.PI;
 let noiseState=0x260411;
 function noise(){noiseState=(Math.imul(noiseState,1664525)+1013904223)>>>0;return noiseState/2147483648-1;}
@@ -19,8 +19,9 @@ function strike(t,hz,tail,modes){
 const silver=[[1,1,4],[2.68,.31,8],[4.13,.19,11],[6.19,.07,16]];
 const jade=[[1,1,3.8],[2.12,.36,5.7],[3.82,.15,8.8],[5.22,.07,12]];
 const bronze=[[1,.68,3.9],[1.49,.48,4.3],[2.39,.28,5.3],[3.14,.22,7],[4.32,.14,8.2],[5.66,.08,9]];
-function render(phase,tier){
-  const cue=LOOT_SOUNDS[phase][tier],length=Math.floor(cue.length*sampleRate),samples=new Float64Array(length);
+const glass=[[1,1,3.1],[2,.31,4.9],[3.49,.14,7.1],[5.41,.065,10.5]];
+function render(phase,tier,cue){
+  const length=Math.floor(cue.length*sampleRate),samples=new Float64Array(length);
   let lastNoise=0,peak=0;
   for(let i=0;i<length;i++){
     const t=i/sampleRate,r=noise(),high=r-lastNoise;lastNoise+=.31*high;
@@ -31,10 +32,26 @@ function render(phase,tier){
       if(tier===2)sound=.57*strike(t,174.61,1.12,bronze)+.42*strike(t+.001,698.46,.87,jade)+.39*strike(t-.062,1046.50,.86,jade)+.32*strike(t-.138,1396.91,.93,silver)+.095*strike(t-.238,2093,.56,jade);
       sound+=high*(.22+.08*tier)*Math.exp(-t*115)*(1-Math.exp(-t*1200));
       if(tier===2)sound+=high*.10*Math.exp(-Math.pow((t-.04)/.039,2))+Math.sin(tau*72*t)*.12*Math.exp(-t*20);
-    }else{
+      if(tier===3){
+        const pulse = (t-.42)/.24;
+        sound+=.62*strike(t,98,1.9,bronze)+.19*strike(t,49,1.4,bronze);
+        sound+=high*.14*Math.exp(-pulse*pulse)*(.55+.45*Math.sin(tau*(t*12+t*t*23)));
+        sound+=.37*strike(t-.20,523.25,1.31,jade)+.40*strike(t-.33,783.99,1.43,glass);
+        sound+=.32*strike(t-.51,1046.50,1.56,glass)+.27*strike(t-.72,1567.98,1.3,glass);
+      }
+    }else if(phase==='gearLand'){
       sound=high*.27*Math.exp(-t*125)*(1-Math.exp(-t*1400));
-      sound+=.28*strike(t,170+tier*37,.10,bronze)+.35*strike(t,[890,987.77,1046.50][tier],[.13,.27,.42][tier],jade);
+      sound+=.28*strike(t,170+tier*37,.10,bronze)+.35*strike(t,[890,987.77,1046.50,659.25][tier],[.13,.27,.42,.55][tier],jade);
       if(tier===2)sound+=.16*strike(t-.044,1567.98,.34,silver);
+      if(tier===3)sound+=.24*strike(t-.078,1318.51,.49,glass);
+    }else if(phase==='success'){
+      sound=.48*strike(t,330,.24,bronze)+.35*strike(t-.072,659.25,.63,jade);
+      sound+=.38*strike(t-.142,987.77,.62,glass)+.47*strike(t-.224,1318.51,.77,glass);
+      sound+=high*.32*Math.exp(-t*135)*(1-Math.exp(-t*1500));
+    }else{
+      sound=.59*strike(t,196,.23,bronze)+.32*strike(t-.07,130.81,.39,bronze);
+      sound+=high*.29*Math.exp(-t*19)*(1-Math.exp(-t*1500));
+      sound+=.16*strike(t-.026,467,.12,silver)-.12*strike(t-.045,261,.17,bronze);
     }
     // Preserve literal silence between cues; avoid clicks at slice boundaries.
     const edge=Math.min(1,t/.002,(cue.length-t)/.022);
@@ -43,9 +60,10 @@ function render(phase,tier){
   const start=Math.round(cue.offset*sampleRate),gain=.86/peak;
   for(let i=0;i<length;i++)wave[start+i]=samples[i]*gain;
 }
-for(const phase of Object.keys(LOOT_SOUNDS))for(let tier=0;tier<3;tier++)render(phase,tier);
+for(const [phase,cues] of Object.entries(LOOT_SOUNDS)) cues.forEach((cue,tier)=>render(phase,tier,cue));
+for(const [phase,cue] of Object.entries(FORGE_SOUNDS))render(phase,0,cue);
 const wav=Buffer.alloc(44+wave.length*2);
 wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(sampleRate,24);wav.writeUInt32LE(sampleRate*2,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(wave.length*2,40);
 for(let i=0;i<wave.length;i++)wav.writeInt16LE(Math.round(wave[i]*32767),44+i*2);
-await mkdir('public/game/audio/loot',{recursive:true});await writeFile('public/game/audio/loot/treasure-chimes-v1.wav',wav);
-console.log(`Wrote six cues, ${wave.length/sampleRate} s, ${wav.length} bytes`);
+await mkdir('public/game/audio/loot',{recursive:true});await writeFile('public/game/audio/loot/treasure-chimes-v2.wav',wav);
+console.log(`Wrote ten cues, ${wave.length/sampleRate} s, ${wav.length} bytes`);

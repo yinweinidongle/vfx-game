@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import {readFile} from 'node:fs/promises';import {GearDynamics} from '../src/game/GearDynamics.js';import {sampleHeavenBlade} from '../src/game/HeavenBladeMotion.js';import {GameState,readSave} from '../src/game/GameState.js';import {ENCOUNTERS,heightAt} from '../src/game/GameData.js';import {createLootMotion,advanceLoot} from '../src/game/LootMotion.js';import {equipmentProfile} from '../src/game/EquipmentCatalog.js';import {GameThunderVFX} from '../src/game/GameThunderVFX.js';import {GameAscendantVFX} from '../src/game/GameAscendantVFX.js';import {GameLootVFX} from '../src/game/GameLootVFX.js';import {equipmentSources,lootSources} from './helpers/equipment-assets.js';
+import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import {readFile} from 'node:fs/promises';import {GearDynamics} from '../src/game/GearDynamics.js';import {sampleHeavenBlade} from '../src/game/HeavenBladeMotion.js';import {GameState,readSave} from '../src/game/GameState.js';import {ENCOUNTERS,heightAt} from '../src/game/GameData.js';import {createLootMotion,advanceLoot} from '../src/game/LootMotion.js';import {equipmentProfile,TAICHU_MODELS} from '../src/game/EquipmentCatalog.js';import {GameThunderVFX} from '../src/game/GameThunderVFX.js';import {GameAscendantVFX} from '../src/game/GameAscendantVFX.js';import {GameLootVFX} from '../src/game/GameLootVFX.js';import {equipmentSources,lootSources} from './helpers/equipment-assets.js';
 
 test('cloth and wing inertia react to starts, stops and turns, settle without runaway motion and retain buffers',()=>{
  function sim(fps){const physics=new GearDynamics(),p={x:0,z:0,yaw:0},cloth=physics.cloak,wings=physics.wings;physics.reset(p);let trail=0,sway=0,afterStop=0;
@@ -16,7 +16,7 @@ test('higher level and enhancement select real new silhouettes; bow, dao and jia
  const sources=await equipmentSources();for(const slot of ['wings','cloak']){const ids=[1,20,40].map(level=>equipmentProfile({slot,level,enhance:0}).id);assert.equal(new Set(ids).size,3);for(const id of ids)assert.ok(sources[id]);assert.equal(equipmentProfile({slot,level:1,enhance:16}).id,ids[2]);}
  for(const family of ['bow','dao','jian']){const low=equipmentProfile({slot:'weapon',weaponKind:family,level:1,enhance:0}),high=equipmentProfile({slot:'weapon',weaponKind:family,level:40,enhance:0});assert.notEqual(low.id,high.id);assert.ok(sources[high.id]);}
  for(const id of ['bow-star','bow-imperial']){const fit=sources[id].userData.gearFit;assert.ok(fit);assert.ok(fit.lower[1]<-.35&&fit.upper[1]>.35);assert.ok(fit.lower[2]<-.04);}
- const loot=JSON.parse(await readFile('public/game/models/equipment/loot-manifest.json','utf8'));assert.equal(Object.keys(loot).length,15);assert.ok(Object.values(loot).every(m=>m.triangles<800));
+ const loot=JSON.parse(await readFile('public/game/models/equipment/loot-manifest.json','utf8'));assert.equal(Object.keys(loot).length,15+TAICHU_MODELS.length);assert.ok(Object.values(loot).every(m=>m.triangles<800));
 });
 
 test('heaven blade rests hilt-down and swings its cutting edge down; the point never stabs the ground',()=>{
@@ -43,7 +43,7 @@ test('awakening effect visibility never changes the scene light count',async()=>
  for(const index of [3,4,5]){a.handle({type:'awakening',index,targetX:0,targetZ:0,yaw:0,color:'#ffc765'});b.handle({type:'awakening'});s.awakening.index=index;s.awakening.active=true;s.awakening.age=1.2;a.update(1/60);b.update(1/60);assert.equal(count(),1);a.reset();b.reset();assert.equal(count(),1);}a.dispose();b.dispose();
 });
 
-test('all fifteen dropped item silhouettes land on the ground at every heading without standing on edge or sinking',async()=>{
+test('all dropped item silhouettes land on the ground at every heading without standing on edge or sinking',async()=>{
  const templates=await lootSources(),s=new GameState(),fx=new GameLootVFX(new T.Scene(),s,templates,new T.PerspectiveCamera()),matrix=new T.Matrix4(),point=new T.Vector3();
  for(const [id,root]of Object.entries(templates)){
   if(id.startsWith('bow-')){const size=new T.Box3().setFromObject(root).getSize(new T.Vector3());assert.ok(size.z<size.x*.6,'bow lies in the same XY plane as other flat equipment');}
