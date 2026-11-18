@@ -106,7 +106,13 @@ export class RPGGame {
     const reveal = this.lootReveal?.active;
     const thunder = reveal ? .57 : this.awakeningView?.darkness||0;
     if(thunder>0){this.sun.intensity*=1-thunder*.55;this.sky.intensity*=1-thunder*.35;this.scene.environmentIntensity*=1-thunder*.35;this.scene.background.lerp(this.daylight.colors.night,thunder*.56);this.scene.fog.color.copy(this.scene.background);}
-    const cx=p.x+((this.fx?.divineTargetX??p.x)-p.x)*framing*.2,cz=p.z+((this.fx?.divineTargetZ??p.z)-p.z)*framing*.2,zoom=this.zoom+framing*3.8;
+    const realm=this.state.realms.realm;
+    const revealAge=realm?this.state.time-(this.realmArrival??-10):10;
+    const arrival=realm && !this.input.dx && !this.input.dz && !p.dash ? 1-T.MathUtils.smoothstep(revealAge, .18,1.65) : 0;
+    const atThreshold=realm && !this.state.realms.started;
+    const cx=p.x+((this.fx?.divineTargetX??p.x)-p.x)*framing*.2;
+    const cz=p.z+((this.fx?.divineTargetZ??p.z)-p.z)*framing*.2-arrival*2.3-(atThreshold?2.2:0);
+    const zoom=this.zoom+framing*3.8+arrival*3+(atThreshold?1.1:0);
     this.cameraTarget.set(cx,heightAt(p.x,p.z)+1.2+framing*1.2,cz);
     const x=cx+Math.sin(this.cameraYaw)*zoom,y=heightAt(p.x,p.z)+zoom*.85,z=cz+Math.cos(this.cameraYaw)*zoom;
     this.cameraEye.set(x,y,z);this.skillCamera.update(reveal ? 0 : dt,this.cameraEye,this.cameraTarget);
@@ -130,6 +136,10 @@ export class RPGGame {
       this.ui.lootRevealTime = Math.max(this.ui.lootRevealTime || 0, .25);
     }
     for(const e of events){
+      if(e.type==='realmTravel'){
+        this.skillCamera.cancel();this.cameraSnap=true;this.realmArrival=this.state.time;
+        this.input.clear();this.input.pointerKnown=false;this.input.path=null;this.input.pathIndex=0;
+      }
       if(e.type==='spawn')this.actors.spawn(e.enemy);
       if(e.type==='attack'||e.type==='cast')this.actors.attack(e.index>=2);
       if(e.type==='cast')this.skillCamera.begin(e.index);

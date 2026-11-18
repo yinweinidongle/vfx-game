@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeRelicChest } from './RelicChest.js';
 import { loadRuins } from './GameRuins.js';
+import { RealmWorld } from './RealmWorld.js';
+import { REALMS } from './RealmData.js';
 import { MagicMandala } from '../vfx/cultivator/MagicMandala.js';
 import { CONNECTIONS, ENCOUNTERS, INTERACTABLES, ZONES, heightAt, isLand, segmentDistance } from './GameData.js';
 
@@ -15,7 +17,9 @@ export class GameWorld {
     this.scene = scene; this.state = state; this.group = new T.Group(); scene.add(this.group);
     this.night = { value: state.cycle?.night || 0 }; this.clock = { value: 0 }; this.hero = { value: new T.Vector3() }; this.mandalas = []; this.interact = new Map(); this.gates = [];
     this.materials = []; this.geometries = []; this.resources = []; this.colliders = []; this.ground(); this.architecture(); this.interactables(); this.atmosphere();
+    for(const realm of REALMS)this.colliders.push(...realm.obstacles);
     state.obstacles = this.colliders;
+    this.realms = new RealmWorld(scene,state,this.clock,this.night,this.hero);
   }
   stone(color = '#b7bfb6') {
     const m = new T.MeshStandardMaterial({ color, roughness: .88 });
@@ -204,6 +208,9 @@ export class GameWorld {
   }
   update(time, dt) {
     this.clock.value = time; const p = this.state.player; this.hero.value.set(p.x, heightAt(p.x,p.z)+1.1, p.z);
+    this.realms.update(time);
+    this.group.visible = !this.state.realms.realm;
+    if(!this.group.visible) return;
     for (const { group, seal } of this.gates) group.visible = !this.state.save.seals[seal];
     for (const r of this.interact.values()) {
       if (r.gem) { r.gem.rotation.y = time * .45; r.gem.position.y = 2 + Math.sin(time * 1.2) * .1; }
@@ -217,6 +224,7 @@ export class GameWorld {
     this.crystal.rotation.y = time * .2;
   }
   dispose() {
+    this.realms.dispose();
     this.group.removeFromParent(); for (const x of this.mandalas) x.seal.dispose();
     for (const g of new Set(this.geometries)) g.dispose(); for (const m of new Set(this.materials)) m.dispose();
     for (const root of this.resources) root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } } });

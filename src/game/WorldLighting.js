@@ -1,10 +1,12 @@
 import * as T from 'three';
 import { INTERACTABLES,heightAt } from './GameData.js';
+import { REALMS } from './RealmData.js';
 
 /** Sun, moon, ambient fill and horizon share the simulation's continuous clock. */
 export class WorldLighting {
   constructor(game) {
     this.game = game;
+    this.realmColors=Object.fromEntries(REALMS.map(realm=>[realm.id,{sky:new T.Color(realm.sky),sun:new T.Color(realm.sun)}]));
     this.colors = Object.fromEntries(Object.entries({ day: '#8ca9af', dusk: '#777486', night: '#101f36',
       sun: '#fff1d2', sunset: '#ffaf72', moon: '#a2c7ff', sky: '#e0f2f0', darkSky: '#789cc7',
       ground: '#344c50', darkGround: '#1d293d' }).map(([k, v]) => [k, new T.Color(v)]));
@@ -19,7 +21,13 @@ export class WorldLighting {
     // The existing shadow-casting light becomes moonlight at night; one shadow map.
     g.sun.intensity = (2.4 * (1 - n) + .66 * n) * (1 - framing * .42);
     g.sky.color.copy(c.sky).lerp(c.darkSky, n);g.sky.groundColor.copy(c.ground).lerp(c.darkGround, n);
-    g.sky.intensity = (1.15 - n * .56) * (1 - framing * .23);
+    const realmId=g.state.realms?.realm?.id, realm=this.realmColors[realmId];
+    if(realm){
+      g.scene.background.lerp(realm.sky,.83-n*.52);g.scene.fog.color.copy(g.scene.background);
+      g.sun.color.lerp(realm.sun,.7-n*.42);g.sky.color.lerp(realm.sun,.40);
+      g.sun.intensity*=realmId==='stars' ? .71 : .80;
+    }
+    g.sky.intensity = (1.15 - n * .56) * (1 - framing * .23) * (realm ? .88 : 1);
     g.scene.environmentIntensity = (.38 - n * .17) * (1 - framing * .24);
     g.rim.intensity = .7 - n * .42;this.moon.intensity = n * .4;
     g.renderer.toneMappingExposure = .94 + n * .08;

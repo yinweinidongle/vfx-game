@@ -9,6 +9,7 @@ import { GameArcherRig } from './GameArcherRig.js';
 import { NightEyes } from './NightEyes.js';
 import { EliteInsignia } from './EliteInsignia.js';
 import { TaichuAfterimages } from './TaichuAfterimages.js';
+import { RealmCreatures } from './RealmCreatures.js';
 
 class CharacterTextureLoader extends T.TextureLoader {
   load(url,...callbacks) {
@@ -21,7 +22,7 @@ class CharacterTextureLoader extends T.TextureLoader {
 }
 
 export class GameActors {
-  constructor(scene, state) { this.scene = scene; this.state = state; this.night={value:state.cycle?.night||0};this.nightEyes=new NightEyes(scene); this.enemies = new Map(); this.templates = []; this.assets = {}; this.motion = {}; }
+  constructor(scene, state) { this.scene = scene; this.state = state; this.night={value:state.cycle?.night||0};this.nightEyes=new NightEyes(scene); this.creatures=new RealmCreatures(); this.enemies = new Map(); this.templates = []; this.assets = {}; this.motion = {}; }
   async load(onProgress) {
     const base = import.meta.env.BASE_URL, kind = this.state.kind;
     const manager = new T.LoadingManager(),embeddedURLs=new Set();
@@ -116,6 +117,13 @@ export class GameActors {
     this.switch(view, 'attack', .07); view.active.setEffectiveTimeScale(view.active.getClip().duration / (cast ? 1.2 : .65/this.state.stats.attackSpeed));
   }
   spawn(enemy) {
+    const old=this.enemies.get(enemy.id);
+    if(old){this.release(old);this.enemies.delete(enemy.id);}
+    if(enemy.realm){
+      const view=this.creatures.create(enemy);
+      this.scene.add(view.group);this.enemies.set(enemy.id,view);
+      return;
+    }
     const view = this.create(this.enemySource, this.motion.enemy, 2.2, enemy); view.group.scale.setScalar(enemy.scale);
     if (enemy.type !== 'caster' && enemy.ability !== 'storm') this.addWeapon(view, 'sword'); this.enemies.set(enemy.id, view);
   }
@@ -135,6 +143,13 @@ export class GameActors {
     for (const m of view.materials) if (m.emissive) m.emissive.setRGB(p.hurtFlash > 0 ? .16 : 0, 0, 0);
     for (const [id, v] of this.enemies) {
       const e = this.state.enemies[id];
+      if (e!==v.enemy) {this.release(v);this.enemies.delete(id);continue;}
+      if (v.realmCreature) {
+        if(e.hp<=0 && e.deathAge>=1.2){this.release(v);this.enemies.delete(id);continue;}
+        v.group.visible=Math.hypot(e.x-p.x,e.z-p.z)<50;
+        if(v.group.visible)this.creatures.update(v,this.state.time,dt,heightAt(e.x,e.z));
+        continue;
+      }
       if (e.hp <= 0) {
         if (e.deathAge >= 1.4) { this.release(v);this.enemies.delete(id);continue; }
         v.pivot.rotation.x = Math.min(1.35, e.deathAge * 2); for (const m of v.materials) m.opacity = Math.max(0, 1 - e.deathAge / 1.4); if(v.insignia)v.insignia.group.visible=false;continue;
@@ -154,6 +169,7 @@ export class GameActors {
     this.nightEyes.update(this.enemies,this.state.time,this.state.cycle.rage);
   }
   release(v) {
+    if(v.realmCreature){v.group.removeFromParent();v.materials.forEach(material=>material.dispose());return;}
     v.archerRig?.dispose();v.insignia?.dispose();v.crown?.geometry.dispose();v.crown?.material.dispose();
     v.mixer.stopAllAction();v.mixer.uncacheRoot(v.model);v.group.removeFromParent();v.materials.forEach(m=>m.dispose());
     v.model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.dispose();});
@@ -162,6 +178,7 @@ export class GameActors {
     this.nightEyes.dispose();this.gearAppearance?.dispose();this.afterimages?.dispose();
     const views = [this.player,this.warmActor, ...this.enemies.values()].filter(Boolean);
     for (const v of views) this.release(v);
+    this.creatures.dispose();
     this.weaponMaterials?.forEach(m=>m.dispose());
     for (const root of this.templates) root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } } });
   }

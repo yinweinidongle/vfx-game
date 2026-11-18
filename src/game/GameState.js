@@ -15,6 +15,7 @@ import { GameGear } from './GameGear.js';
 import { GameTaichuSet } from './GameTaichuSet.js';
 import { damageThroughDefense, levelsEarned, TAICHU_UNLOCK_LEVEL } from './Progression.js';
 import { cleanGroundStones, dropSpiritStones, groundStones } from './SpiritStones.js';
+import { RealmJourney, readRealmProgress } from './RealmJourney.js';
 
 const fresh = kind => ({ version: 1, kind, level: 1, xp: 0, gold: 0, seals: [false, false], cleared: [], opened: [], memories: [], inventory: [], equipment: {}, boons: { power: 0, vitality: 0, spirit: 0 }, checkpoint: 'camp', playTime: 0, kills: 0, deaths: 0, won: false, challenge: 0, pendingBoons: 0, trackedChapter: 0, gearBag:[],gearEquipped:{},nextGearId:1,gearPity:0,shopEpoch:0,shopBought:[],groundGear:[],nextLootId:1 });
 export function readSave(storage,key=SAVE_KEY) {
@@ -40,6 +41,7 @@ export function readSave(storage,key=SAVE_KEY) {
     for (const b of BOONS) d.boons[b.id] = clamp(Math.floor(Number(s.boons?.[b.id]) || 0), 0, 50);
     if (INTERACTABLES.some(i => i.type === 'camp' && i.id === s.checkpoint)) d.checkpoint = s.checkpoint;
     readGearSave(s,d);
+    d.realms = readRealmProgress(s.realms);
     d.groundStones = cleanGroundStones(s.groundStones, new Set(d.groundGear.map(drop => drop.lootId)));
     for (const drop of d.groundStones) d.nextLootId = Math.max(d.nextLootId, drop.lootId + 1);
     return d;
@@ -64,6 +66,7 @@ export class GameState {
     const camp = INTERACTABLES.find(i => i.id === this.save.checkpoint); this.player.x = camp.x; this.player.z = camp.z - 3;
     Object.assign(this.player,{shield:0,shieldDelay:0,regenLock:0,energyHitAt:-10,hurtFlash:0});
     this.recalculate(); this.player.hp = this.stats.hp; this.dead = false; this.boss = null; this.nearby = null;
+    this.realms = new RealmJourney(this);
     this.saveDirty = false; this.rng = this.save.rng ?? 19387; this.lastZone = zoneAt(this.player.x, this.player.z).id;
     this.settleCappedBoons();
   }
@@ -112,6 +115,8 @@ export class GameState {
     return true;
   }
   objective() {
+    const expedition=this.realms.objective();
+    if(expedition) return expedition;
     const region = REGIONS[this.save.trackedChapter - 1];
     if (region) {
       const next = region.encounters.find(e => !this.save.cleared.includes(e.id));
@@ -248,7 +253,8 @@ export class GameState {
       this.gear.drop(enemy);
       dropSpiritStones(this, enemy);
       this.emit('death', {enemy});
-      this.encounters.onDeath(enemy);
+      if(enemy.realm) this.realms.onDeath(enemy);
+      else this.encounters.onDeath(enemy);
       this.saveDirty = true;
     }
   }
@@ -313,6 +319,12 @@ export class GameState {
   }
   interact() {
     const o = this.nearby; if (!o || this.dead) return;
+    if (this.realms.realm) {
+      const current=this.realms.interaction();
+      if(current?.type==='realmStar') this.realms.mark(current.index);
+      else if(current?.type==='realmExit') this.realms.leave();
+      return;
+    }
     if (o.type === 'camp') {
       if (this.enemies.some(e => e.hp > 0 && distance(e, this.player) < 10)) { this.emit('toast', { text: '附近尚有敌人，暂时无法休整。' }); return; }
       this.save.checkpoint = o.id; this.player.hp = this.stats.hp; this.player.energy=this.stats.energyMax;this.player.shield=this.vitality.capacity;this.player.shieldDelay=this.player.regenLock=0; this.player.stamina = 100; this.player.potion = 0; this.saveDirty = true; this.emit('camp');
@@ -337,7 +349,7 @@ export class GameState {
     if (!this.save.won || !this.gear.canTrade()) return null;
     const progress = structuredClone(this.save);
     Object.assign(progress, {challenge: progress.challenge + 1, won: false, seals: [false, false],
-      cleared: [], opened: [], trackedChapter: 0, checkpoint: 'camp', groundGear: [], groundStones: [], rng: this.rng});
+      cleared: [], opened: [], trackedChapter: 0, checkpoint: 'camp', realms:readRealmProgress(null), groundGear: [], groundStones: [], rng: this.rng});
     const next = new GameState(this.kind, progress);
     for (const drop of this.drops) {
       if (!drop.alive) continue;
@@ -353,6 +365,7 @@ export class GameState {
     for (const e of this.enemies) if (e.hp > 0) { e.x=e.homeX;e.z=e.homeZ;e.hp=e.maxHp;e.frozen=e.stagger=0;e.state = 'chase'; e.timer = 1.5; }
     for (const p of this.projectiles) p.alive = false; for (const z of this.zones) z.alive = false;
     this.haloVolley.reset();this.fervorVolley.reset();this.taichuSet.reset();this.lockedTarget=null;
+    this.realms.revive();
     this.emit('revive');
   }
   update(dt, input) {
@@ -375,7 +388,8 @@ export class GameState {
     } else if (p.actionTime > .8 || p.action === 'run' || p.action === 'dodge') p.action = 'idle';
     p.vx=dt>0?(p.x-lastX)/dt:0;p.vz=dt>0?(p.z-lastZ)/dt:0;
     const zone = zoneAt(p.x, p.z); if (zone.id !== this.lastZone) { this.lastZone = zone.id; this.emit('region', { zone }); }
-    this.encounters.update(dt);
+    if(this.realms.realm) this.realms.update(dt);
+    else this.encounters.update(dt);
     this.updateEnemies(dt); this.updateProjectiles(dt);this.haloVolley.update(dt);this.fervorVolley.update();this.awakening.update(dt);this.taichuSet.update();
     for (const z of this.zones) if (z.alive) {
       z.age += dt;
@@ -401,7 +415,8 @@ export class GameState {
       if(d.alive&&d.age>(d.gear?120:20)){d.alive=false;if(d.gear){this.gear.grant(d.gear);this.gear.syncGround();}}
     }
     if(this.drops.length>192)this.drops=this.drops.filter(d=>d.alive);
-    let near = null, best = 3;
+    if(this.realms.realm){this.nearby=this.realms.interaction();return;}
+    let near = null, best = 3.15;
     for (const o of INTERACTABLES) if (!(o.type === 'chest' && this.save.opened.includes(o.id)) && !(o.type === 'seal' && this.save.seals[o.seal])) {
       const d = distance(p, o); if (d < best) { best = d; near = o; }
     }
@@ -422,8 +437,16 @@ export class GameState {
       e.flash = Math.max(0, e.flash - dt); e.frozen = Math.max(0, e.frozen - dt); e.stagger = Math.max(0, e.stagger - dt);
       e.spawnGrace = Math.max(0, (e.spawnGrace || 0) - dt); if (e.spawnGrace > 0) continue;
       if (e.frozen > 0 || e.stagger > 0) continue;
+      if (e.rushLeft>0) {
+        const next=Math.max(0,e.rushLeft-dt);
+        const travel=(e.rushLeft*e.rushLeft-next*next)/.04;
+        this.move(e,e.rushDX*travel,e.rushDZ*travel,.65);
+        e.rushLeft=next;
+        continue;
+      }
       const homeDistance=Math.hypot(e.x-e.homeX,e.z-e.homeZ);
-      if(Math.hypot(p.x-e.homeX,p.z-e.homeZ)>22||homeDistance>19||e.state==='return'){
+      const leash=e.realm?52:22;
+      if(Math.hypot(p.x-e.homeX,p.z-e.homeZ)>leash||homeDistance>leash-3||e.state==='return'){
         e.state='return';e.timer=1;e.hp=Math.min(e.maxHp,e.hp+e.maxHp*dt*.15);
         if(homeDistance>.5){e.yaw=Math.atan2(e.homeX-e.x,e.homeZ-e.z);this.move(e,Math.sin(e.yaw)*e.speed*dt,Math.cos(e.yaw)*e.speed*dt,.5);}else e.state='chase';
         continue;
@@ -438,7 +461,8 @@ export class GameState {
         if((e.type==='ranger'||e.ability==='volley')&&e.timer>.3){const lead=Math.min(.5,(e.level||1)*.05);e.targetX=p.x+(p.vx||0)*lead;e.targetZ=p.z+(p.vz||0)*lead;}
         if (e.timer <= 0) {
           const damage=e.damage*this.cycle.damage;
-          if (e.elite) this.eliteAttack(e,damage);
+          if (e.realm) this.realms.attack(e,damage);
+          else if (e.elite) this.eliteAttack(e,damage);
           else if (e.type === 'ranger') this.launch('enemy', 'enemy', e.x, e.z, Math.atan2(e.targetX - e.x, e.targetZ - e.z), damage);
           else if (e.type === 'caster' || e.type === 'boss' && e.sequence % 3 !== 0) this.enemyZone(e.targetX, e.targetZ, e.type === 'boss' ? 3.6 : 2.5, .8, damage);
           else if (d < e.range + .7) this.hurt(damage,e);

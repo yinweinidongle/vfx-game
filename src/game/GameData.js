@@ -1,3 +1,4 @@
+import { realmAt, onRealmLand, REALM_ENEMIES } from './RealmData.js';
 export const SAVE_KEY = 'frostbound.rpg.save.v1';
 export const SETTINGS_KEY = 'frostbound.rpg.settings.v1';
 export const CLASSES = {
@@ -57,6 +58,7 @@ export const INTERACTABLES = [
   { id: 'memory1', type: 'memory', name: '观星者手记', x: 25, z: 2, text: '“我们曾以为群星永不陨落。直到王座上的人，亲手关闭了天空。”\n两道封印共鸣之时，通往归墟的桥会再次显现。' },
 ];
 export const ENEMY_TYPES = {
+  ...REALM_ENEMIES,
   melee: { name: '失魂守卫', hp: 92, damage: 12, speed: 3.5, range: 2.1, windup: .72, cooldown: 1.8, xp: 28, scale: 1, color: '#718f96' },
   ranger: { name: '幽弦游猎者', hp: 76, damage: 13, speed: 2.7, range: 10, windup: .95, cooldown: 2.5, xp: 34, scale: .94, color: '#70b1c7' },
   caster: { name: '蚀星司祭', hp: 85, damage: 18, speed: 2.3, range: 11, windup: 1.2, cooldown: 3.5, xp: 42, scale: 1.05, color: '#b194c8' },
@@ -66,6 +68,7 @@ export const ENEMY_TYPES = {
   boss: { name: '归墟之主 · 无相', hp: 1850, damage: 28, speed: 2.9, range: 4, windup: 1.15, cooldown: 2.8, xp: 420, scale: 2.5, color: '#b5c9e3' },
 };
 export function chapterAllows(seals, x, z) {
+  if (realmAt(x,z)) return true;
   return (seals[0] || x <= -2) && (seals[1] || x <= 37 || z <= 4);
 }
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -75,7 +78,9 @@ export function segmentDistance(x, z, ax, az, bx, bz) {
   return Math.hypot(x - ax - dx * t, z - az - dz * t);
 }
 export function isLand(x, z, margin = 0) {
+  const realm = realmAt(x,z);
+  if (realm) return onRealmLand(realm,x,z,margin);
   return ZONES.some(a => Math.hypot(x - a.x, z - a.z) < a.radius - margin) || CONNECTIONS.some(a => segmentDistance(x, z, ...a.slice(0, 4)) < a[4] - margin);
 }
 export function heightAt(x, z) { return .15 + Math.sin(x * .11) * .18 + Math.cos(z * .13) * .16; }
-export function zoneAt(x, z) { return x > 37 && z > 4 ? ZONES[2] : x > -3 ? ZONES[1] : ZONES[0]; }
+export function zoneAt(x, z) { return realmAt(x,z) || (x > 37 && z > 4 ? ZONES[2] : x > -3 ? ZONES[1] : ZONES[0]); }

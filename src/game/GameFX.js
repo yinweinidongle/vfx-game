@@ -119,7 +119,9 @@ export class GameFX {
     this.loot.handle(event);this.thunder.handle(event);this.ascendant.handle(event);
     this.spiritBolts?.handle(event);
     this.fervor.handle(event);this.shield.handle(event);this.resonance.handle(event);
-    if(event.type==='revive'){this.divineAge=100;this.projectileTrails.reset();for(const slot of this.bladePool){slot.trail.reset();slot.projectile=null;slot.group.visible=false;}for(const b of this.bursts)b.alive=false;for(const p of this.shards)p.alive=false;this.melee=null;}
+    if(event.type==='revive'||event.type==='realmTravel'){this.divineAge=100;this.projectileTrails.reset();for(const slot of this.bladePool){slot.trail.reset();slot.projectile=null;slot.group.visible=false;}for(const b of this.bursts)b.alive=false;for(const p of this.shards)p.alive=false;this.melee=null;}
+    if(event.type==='realmMark')this.burst(event.x,event.z,'star',1.8,16,event);
+    if(event.type==='realmImpact')this.burst(event.x,event.z,'star',.36,5,event);
     if(event.type==='attack'&&event.kind==='ice'){const p=this.state.attackSocket||this.state.player;this.burst(p.x,p.z,'arrow',.18,3);}
     if(event.type==='hit'&&event.fervor&&!event.fervorSplash)this.burst(event.x,event.z,'spirit',event.finisher?event.finishRadius:.4,event.finisher?12:3,{color:event.color,radiance:1.35,tier:event.finisher?3:0});
     if (event.type === 'hit'&&event.element!=='halo'&&event.element!=='awakening'&&event.element!=='taichu'&&!event.fervor&&!(this.spiritBolts&&event.element==='spirit'&&event.primary)) this.burst(event.x,event.z,event.element,event.element==='frost'||event.element==='slash'?1.5:.65,event.element==='arrow'?7:12,event.echo?{color:event.color,radiance:event.radiance,spiritLevel:event.spiritLevel,skillStage:event.skillStage,skillAccent:event.skillAccent,echo:true}:event);
@@ -210,7 +212,7 @@ export class GameFX {
     const write = (x, z, radius, phase) => { if (count >= 64) return; this.dummy.position.set(x, heightAt(x, z) + .07, z); this.dummy.rotation.set(-Math.PI / 2, 0, 0); this.dummy.scale.setScalar(radius); this.dummy.updateMatrix(); this.warnings.setMatrixAt(count, this.dummy.matrix); this.warningProgress[count++] = phase; };
     for (const e of this.state.enemies) if (e.hp > 0) {
       if(e.spawnGrace>0)write(e.x,e.z,.9,1-e.spawnGrace/.75);
-      if(e.state==='windup'){const targeted=e.type==='caster'||e.ability==='storm';write(targeted?e.targetX:e.x,targeted?e.targetZ:e.z,targeted?1.9:Math.min(e.range,3.5),1-e.timer/e.windup);}
+      if(e.state==='windup' && !e.realm){const targeted=e.type==='caster'||e.ability==='storm';write(targeted?e.targetX:e.x,targeted?e.targetZ:e.z,targeted?1.9:Math.min(e.range,3.5),1-e.timer/e.windup);}
     }
     for (const z of this.state.zones) if (z.alive && z.owner === 'enemy') write(z.x, z.z, z.radius, z.age / z.delay);
     this.warnings.count = count; this.warnings.instanceMatrix.needsUpdate = true; this.warnings.geometry.attributes.aProgress.needsUpdate = true;

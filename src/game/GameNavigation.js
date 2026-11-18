@@ -3,7 +3,7 @@ import { chapterAllows, isLand, segmentDistance } from './GameData.js';
 /** A* with reusable search arrays; routes respect land, obstacles and unlocked seals. */
 export class GameNavigation {
   constructor(state) {
-    this.state=state;this.cell=1.25;this.x0=-60;this.z0=-38;this.width=112;this.height=72;
+    this.state=state;this.cell=1.25;this.x0=-84;this.z0=-98;this.width=142;this.height=157;
     const n=this.width*this.height;this.open=new Uint8Array(n);this.visited=new Uint32Array(n);this.closed=new Uint32Array(n);this.cost=new Float32Array(n);this.parent=new Int32Array(n);this.stamp=0;this.heap=[];
     for(let i=0;i<n;i++){const x=this.x0+(i%this.width)*this.cell,z=this.z0+Math.floor(i/this.width)*this.cell;this.open[i]=Number(isLand(x,z,.58)&&!state.obstacles.some(o=>Math.hypot(x-o.x,z-o.z)<o.r+.6));}
   }

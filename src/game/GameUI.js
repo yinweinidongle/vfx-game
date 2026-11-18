@@ -5,6 +5,7 @@ import * as T from 'three';
 import { BOONS, CLASSES, INTERACTABLES, ITEMS, SKILLS, ZONES, zoneAt, heightAt } from './GameData.js';
 import { itemIcon } from './GameIcons.js';
 import { GameMap } from './GameMap.js';
+import { openRealmAtlas, openRealmMap } from './RealmAtlas.js';
 import { swordEvolution } from './SwordEvolution.js';
 import { MAX_FERVOR } from './AttackGrowth.js';
 import { vitalityGrowth, spiritGrowth } from './CultivationGrowth.js';
@@ -37,6 +38,8 @@ export class GameUI {
     document.querySelector('#shop-button').onclick=()=>this.shop();
     document.querySelector('#inventory-button').onclick = () => this.inventory(); document.querySelector('#pause-button').onclick = () => this.pause(); document.querySelector('#map-open').onclick = () => this.map();
     this.mapCanvas = document.querySelector('#minimap'); this.mapContext = this.mapCanvas.getContext('2d');this.atlas=new GameMap(game);
+    const realmButton=document.createElement('button');realmButton.className='realm-open';realmButton.textContent='秘境';realmButton.setAttribute('aria-label','山海秘境');
+    document.querySelector('#map-open').before(realmButton);realmButton.onclick=()=>openRealmAtlas(this);
     for (const n of this.numbers) { n.element.className = 'damage-number'; n.element.hidden = true; document.querySelector('#damage-layer').append(n.element); }
     this.enemyLabels = new Map(); this.dialog = document.querySelector('#game-dialog'); this.dialog.addEventListener('cancel', e => { e.preventDefault(); if (!this.state.dead && !this.dialog.querySelector('[data-boon]')) this.close(); });
     this.labelRects = new Float32Array(32 * 4);
@@ -67,7 +70,7 @@ export class GameUI {
   pause() {
     const saved = this.game.save();
     if (this.game.saveBlocked) return;
-    this.open(`<span class="kicker">FROSTBOUND / JOURNEY PAUSED</span><h1>片刻，亦是修行。</h1><p>${saved ? '旅途已经记录在此设备。重新进入时从最近的灯台出发。' : '进度尚未写入，请检查浏览器的站点存储权限和可用空间。'}</p><div class="dialog-buttons"><button class="primary" id="resume-game">继续旅程 <span>→</span></button><button id="settings-game">声音与画质</button><button id="controls-game">操作指南</button><a href="game.html">返回标题</a><a href="index.html">返回技能实验室</a></div>`);
+    this.open(`<span class="kicker">FROSTBOUND / JOURNEY PAUSED</span><h1>片刻，亦是修行。</h1><p>${saved ? (this.state.realms.realm ? '已记录秘境机关进度。继续旅途时，会从本境渡口出发。' : '旅途已经记录在此设备。重新进入时从最近的灯台出发。') : '进度尚未写入，请检查浏览器的站点存储权限和可用空间。'}</p><div class="dialog-buttons"><button class="primary" id="resume-game">继续旅程 <span>→</span></button><button id="settings-game">声音与画质</button><button id="controls-game">操作指南</button><a href="game.html">返回标题</a><a href="index.html">返回技能实验室</a></div>`);
     this.dialog.querySelector('#resume-game').onclick = () => this.close(); this.dialog.querySelector('#settings-game').onclick = () => this.settings(); this.dialog.querySelector('#controls-game').onclick = () => this.tutorial();
   }
   settings() {
@@ -77,7 +80,7 @@ export class GameUI {
     this.dialog.querySelector('#volume-setting').oninput = e => this.game.configure({ volume: Number(e.target.value) }); this.dialog.querySelector('#shake-setting').onchange = e => this.game.configure({ shake: e.target.checked }); this.dialog.querySelector('#camera-setting').onchange=e=>this.game.configure({skillCamera:e.target.checked});this.dialog.querySelector('#route-setting').onchange=e=>this.game.configure({route:e.target.checked});this.dialog.querySelector('#music-setting').onchange=e=>this.game.configure({musicMuted:!e.target.checked});this.dialog.querySelector('#settings-done').onclick = () => this.close();
   }
   tutorial() {
-    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、继承太初强化或提升修行。M 查看地图，可追踪区域清剿悬赏。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
+    this.open(`<span class="kicker">旅途须知</span><h1>风雪已至，向前而行。</h1><div class="tutorial-grid"><article><kbd>W A S D</kbd><h3>探索世界</h3><p>键盘移动，右键指定位置；金色路线指引当前目标，V 可开关。靠近灯台、宝箱或封印，按 F 交互。</p></article><article><kbd>鼠标左键</kbd><h3>连贯进攻</h3><p>按住左键，自动锁定附近敌人；鼠标附近的目标优先。Q 追踪冰箭、E 远程剑气、R 法相齐射与陨星。30 级 G 全场落雷，35 级 H 巨刃镇岳，40 级 J 冰暴领域。技能镜头可通过移动或闪避结束。</p></article><article><kbd>Space / C</kbd><h3>攻守取舍</h3><p>红色区域是敌人的攻击预警。闪避短暂无敌；回春恢复生命。留意耐力与灵力。夜间敌人赤目狂暴，伤害与追击速度增强，黎明时恢复。</p></article><article><kbd>I / B / M / Esc</kbd><h3>整备与成长</h3><p>I 打开行囊穿戴五类装备，装备可回收灵石；B 打开商会，在安全灯台可购买、强化至 +20、继承太初强化或提升修行。M 查看地图与悬赏。在灯台旁打开「秘境」，可渡往三处新关卡。</p></article></div><button class="primary" id="tutorial-done">踏入霜界 <span>→</span></button>`);
     this.dialog.querySelector('#tutorial-done').onclick = () => this.close();
   }
   inventory(){if(!this.game.lootReveal?.active)this.gearUI.inventory();}
@@ -95,6 +98,7 @@ export class GameUI {
   }
   map() {
     if(this.game.lootReveal?.active)return;
+    if(this.state.realms.realm){openRealmMap(this);return;}
     const save = this.state.save;
     const regions = REGIONS.map(region => {
       const b = bountyProgress(save, region), tracked = save.trackedChapter === region.chapter;
@@ -137,6 +141,8 @@ export class GameUI {
     this.open(`<span class="kicker">SANCTUARY / 灯火长明</span><h1>在此，重整心神。</h1><p>生命、护罩、灵力与耐力已恢复。灯台已记录为新的归途。</p><div class="camp-upgrade">${itemIcon(2)}<div><h3>淬炼灵锋</h3><p>基础攻击 +12%，新增一枚灵锋与一次追击</p><strong>${cost} 灵石 · 持有 ${this.state.save.gold}</strong></div></div>${this.fervorPreview()}<div class="dialog-buttons"><button class="primary" id="camp-upgrade" ${this.state.save.gold < cost || this.state.growth.stacks>=MAX_FERVOR ? 'disabled' : ''}>${this.state.growth.stacks>=MAX_FERVOR?'锋芒圆满':`淬炼 · ${cost} 灵石`}</button><button id="camp-store">商会 · 强化 · 修行</button><button id="camp-leave">继续旅途</button>${this.state.save.won ? '<button id="challenge-start">开启轮回 · 敌人增强，地面装备结算入包</button>' : ''}</div>`);
     this.dialog.querySelector('#camp-upgrade').onclick = () => { if (this.state.upgrade()) { this.game.save(); this.game.audio.play('level'); this.camp(); } };
     this.dialog.querySelector('#camp-store').onclick=()=>this.shop();
+    const travel=document.createElement('button');travel.textContent='山海秘境 · 选择关卡';
+    this.dialog.querySelector('#camp-leave').before(travel);travel.onclick=()=>openRealmAtlas(this);
     this.dialog.querySelector('#camp-leave').onclick = () => this.close();
     if (this.state.save.won) this.dialog.querySelector('#challenge-start').onclick = () => this.game.challenge();
   }
@@ -146,7 +152,7 @@ export class GameUI {
     this.dialog.querySelectorAll('[data-boon]').forEach(b => b.onclick = () => { if(performance.now()<readyAt)return;this.state.chooseBoon(b.dataset.boon); this.game.save(); if (this.state.pendingBoons) this.boon(); else this.close(); });
   }
   defeat() {
-    this.open(`<span class="kicker">轮回未尽</span><h1>灯火还在，归来便是。</h1><p>已解开的封印、装备与成长都会保留。</p><button class="primary" id="revive-button">于灯台重生 <span>→</span></button>`); this.dialog.querySelector('.dialog-close').hidden = true;
+    this.open(`<span class="kicker">轮回未尽</span><h1>灯火还在，归来便是。</h1><p>已解开的封印、秘境机关、装备与成长都会保留。</p><button class="primary" id="revive-button">${this.state.realms.realm?"于本境渡口重生":"于灯台重生"} <span>→</span></button>`); this.dialog.querySelector('.dialog-close').hidden = true;
     this.dialog.querySelector('#revive-button').onclick = () => { this.state.revive();this.deferredBoon=false;this.close(); this.game.cameraSnap = true; };
   }
   victory() {
@@ -157,6 +163,12 @@ export class GameUI {
   toast(text) { const e = document.querySelector('#game-toast'); e.textContent = text; e.classList.add('visible'); this.toastTimer = 4; }
   region(zone) { document.querySelector('#region-name').textContent = zone.name; document.querySelector('#region-sub').textContent = zone.sub; document.querySelector('#region-toast').classList.add('visible'); this.regionTimer = 3.8; }
   handle(event) {
+    if(event.type==='realmTravel'){
+      const p=this.state.player, zone=zoneAt(p.x,p.z);this.region(zone);this.state.lastZone=zone.id;
+      for(const [id,label]of this.enemyLabels)if(!this.state.enemies[id]){label.remove();this.enemyLabels.delete(id);}
+      for(const number of this.numbers){number.age=2;number.element.hidden=true;}
+    }
+    if(event.type==='realmMark'||event.type==='realmClear')this.toast(event.text);
     if (this.state.dead && ['level','victory','memory','camp','awakeningEnd'].includes(event.type)) {
       if (event.type === 'victory') this.deferredVictory = true;
       return;
@@ -227,7 +239,13 @@ export class GameUI {
         b.classList.toggle('unavailable',unavailable);b.classList.toggle('locked',locked);b.setAttribute('aria-disabled',String(unavailable));
         if(i>=3)b.classList.toggle('awakening-ready',!unavailable);
       });
-      const boss = this.state.boss, element = document.querySelector('.boss-status'); element.hidden = !boss || boss.hp <= 0; if (boss) { document.querySelector('#boss-fill').style.width = `${boss.hp / boss.maxHp * 100}%`; document.querySelector('#boss-phase').textContent = ['第一式 · 守界','第二式 · 星陨','终式 · 万象俱灭'][boss.phase]; }
+      const boss = this.state.realms.realm ? this.state.realms.keeper : this.state.boss, element = document.querySelector('.boss-status');
+      element.hidden = !boss || boss.hp<=0;
+      if(boss){
+        element.querySelector('h2').textContent=boss.name; element.querySelector('span').textContent=boss.realm?'秘境镇守':'失落的守门者';
+        document.querySelector('#boss-fill').style.width=`${boss.hp/boss.maxHp*100}%`;
+        document.querySelector('#boss-phase').textContent=boss.realm?boss.trait:['第一式 · 守界','第二式 · 星陨','终式 · 万象俱灭'][boss.phase];
+      }
     }
     const width = this.game.container.clientWidth, height = this.game.container.clientHeight;
     for (const n of this.numbers) if (n.age <= 1.1) {

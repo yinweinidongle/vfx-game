@@ -19,6 +19,18 @@ export function encounterProfile(encounter, challenge = 0) {
   };
 }
 
+export function createEncounterEnemy(type, point, profile, encounter, id, ordinal = 0) {
+  const spec = ENEMY_TYPES[type];
+  const health = Math.round(spec.hp * profile.health * (spec.elite ? 1.35 : 1));
+  return {...spec, x:point.x, z:point.z, id, encounter, type, level:profile.level, maxHp:health, hp:health,
+    homeX:point.x, homeZ:point.z, damage:Math.round(spec.damage * profile.damage),
+    speed:spec.speed * profile.speed,
+    defense:Math.round(profile.defense * (type === 'boss' ? 1.28 : spec.elite ? 1.16 : 1)),
+    cooldown:spec.cooldown * profile.recovery, xp:Math.round(spec.xp * profile.reward),
+    yaw:Math.PI, state:'chase', timer:.65 + ordinal * .19, spawnGrace:.75,
+    frozen:0, stagger:0, flash:0, deathAge:0, phase:0, sequence:0, targetX:0, targetZ:0};
+}
+
 export class EncounterDirector {
   constructor(state) { this.state = state; this.active = new Map(); }
   accessible(encounter) { return (encounter.chapter < 2 || this.state.save.seals[0]) && (encounter.chapter < 3 || this.state.save.seals[1]); }
@@ -62,15 +74,8 @@ export class EncounterDirector {
         s.enemies.splice(s.enemies.length - placed.length, placed.length);
         return false;
       }
-      const type = types[i], spec = ENEMY_TYPES[type], health = Math.round(spec.hp * profile.health * (spec.elite ? 1.35 : 1));
-      const e = { ...spec, ...point, id: s.enemies.length, encounter: battle.encounter.id, type,
-        level: profile.level, maxHp: health, hp: health,
-        damage: Math.round(spec.damage * profile.damage), speed: spec.speed * profile.speed,
-        defense: Math.round(profile.defense * (type === 'boss' ? 1.28 : spec.elite ? 1.16 : 1)),
-        cooldown: spec.cooldown * profile.recovery, xp: Math.round(spec.xp * profile.reward),
-        yaw: Math.PI, state: 'chase', timer: .65 + i * .19, spawnGrace: .75,
-        frozen: 0, stagger: 0, flash: 0, deathAge: 0, phase: 0, sequence: 0, targetX: 0, targetZ: 0 };
-      e.homeX = e.x; e.homeZ = e.z; s.enemies.push(e); placed.push(e);
+      const e = createEncounterEnemy(types[i], point, profile, battle.encounter.id, s.enemies.length, i);
+      s.enemies.push(e); placed.push(e);
     }
     for (const e of placed) {
       s.emit('spawn', { enemy: e });

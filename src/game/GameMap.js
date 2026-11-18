@@ -1,8 +1,32 @@
 import { ZONES, CONNECTIONS, INTERACTABLES, segmentDistance, heightAt, isLand } from './GameData.js';
+import { shoreRadius } from './RealmData.js';
 
 /** A cached relief atlas of the playable terrain, with crisp live cartography. */
 export class GameMap {
-  constructor(game) { this.game=game;this.state=game.state;this.bounds={x:-64,z:-43,w:142,h:100};this.makeRelief(); }
+  constructor(game) { this.game=game;this.state=game.state;this.bounds={x:-64,z:-43,w:142,h:100};this.realmCharts=new Map();this.makeRelief(); }
+  chart(realm) {
+    if(this.realmCharts.has(realm.id))return this.realmCharts.get(realm.id);
+    const canvas=document.createElement('canvas'), size=560, span=56;
+    canvas.width=canvas.height=size;
+    const pen=canvas.getContext('2d'), unit=size/span;
+    pen.fillStyle=realm.ink;pen.fillRect(0,0,size,size);pen.translate(size/2,size/2);pen.scale(unit,unit);
+    function coast(factor){
+      pen.beginPath();
+      for(let step=0;step<=144;step++){
+        const angle=step/144*Math.PI*2,radius=shoreRadius(realm,angle)*factor;
+        pen.lineTo(Math.cos(angle)*radius*realm.rx,Math.sin(angle)*radius*realm.rz);
+      }
+      pen.closePath();
+    }
+    for(let band=0;band<4;band++){coast(1.04+band*.048);pen.strokeStyle=realm.color+'26';pen.lineWidth=.10;pen.stroke();}
+    coast(1);pen.fillStyle=realm.land;pen.fill();pen.strokeStyle=realm.color+'a0';pen.lineWidth=.13;pen.stroke();
+    for(let band=0;band<6;band++){coast(.38+band*.095);pen.strokeStyle=realm.color+'25';pen.stroke();}
+    pen.setLineDash([.48,.6]);pen.beginPath();pen.moveTo(realm.entry.x-realm.x,realm.entry.z-realm.z);
+    for(const point of [...realm.nodes,realm.altar])pen.lineTo(point.x-realm.x,point.z-realm.z);
+    pen.strokeStyle='#e9ddbc80';pen.lineWidth=.105;pen.stroke();
+    const chart={canvas,bounds:{x:realm.x-span/2,z:realm.z-span/2,w:span,h:span}};
+    this.realmCharts.set(realm.id,chart);return chart;
+  }
   makeRelief() {
     const map=this.terrain=document.createElement('canvas');map.width=1136;map.height=800;const c=map.getContext('2d'),data=c.createImageData(map.width,map.height),b=this.bounds;
     for(let iy=0;iy<map.height;iy++)for(let ix=0;ix<map.width;ix++){
@@ -45,14 +69,15 @@ export class GameMap {
     }
   }
   draw(canvas) {
-    const c=canvas.getContext('2d'),w=canvas.width/2,h=canvas.height/2,large=w>300,p=this.state.player,b=this.bounds;
-    const scale=large?Math.min(w/b.w,h/b.h):w/46,cx=large?7:p.x,cz=large?7:p.z-2;
+    const c=canvas.getContext('2d'),w=canvas.width/2,h=canvas.height/2,large=w>300,p=this.state.player;
+    const run=this.state.realms,realm=run?.realm,chart=realm?this.chart(realm):null,b=chart?.bounds||this.bounds;
+    const scale=large?Math.min(w/b.w,h/b.h):w/46,cx=large?(realm?.x??7):p.x,cz=large?(realm?.z??7):p.z-2;
     const sx=x=>w/2+(x-cx)*scale,sy=z=>h/2+(z-cz)*scale;
     c.setTransform(2,0,0,2,0,0);c.clearRect(0,0,w,h);c.fillStyle='#0d1d26';c.fillRect(0,0,w,h);
-    c.drawImage(this.terrain,sx(b.x),sy(b.z),b.w*scale,b.h*scale);
+    c.drawImage(chart?.canvas||this.terrain,sx(b.x),sy(b.z),b.w*scale,b.h*scale);
     // Delicate chart grid and inset frame stay at display-pixel resolution.
     c.strokeStyle='#b3cfb80b';c.lineWidth=.6;for(let x=Math.floor((cx-w/scale/2)/10)*10;x<cx+w/scale/2;x+=10){c.beginPath();c.moveTo(sx(x),0);c.lineTo(sx(x),h);c.stroke();}for(let z=Math.floor((cz-h/scale/2)/10)*10;z<cz+h/scale/2;z+=10){c.beginPath();c.moveTo(0,sy(z));c.lineTo(w,sy(z));c.stroke();}
-    for(let i=1;i<3;i++)if(!this.state.save.seals[i-1]){const z=ZONES[i];c.fillStyle='#0719238c';c.beginPath();c.arc(sx(z.x),sy(z.z),z.radius*scale,0,Math.PI*2);c.fill();}
+    if(!realm)for(let i=1;i<3;i++)if(!this.state.save.seals[i-1]){const z=ZONES[i];c.fillStyle='#0719238c';c.beginPath();c.arc(sx(z.x),sy(z.z),z.radius*scale,0,Math.PI*2);c.fill();}
     const path=this.game.guide?.path;
     if(this.game.settings.route!==false&&path?.length){c.save();c.beginPath();path.forEach((q,i)=>i?c.lineTo(sx(q.x),sy(q.z)):c.moveTo(sx(q.x),sy(q.z)));c.strokeStyle='#e5c68c30';c.lineWidth=5;c.lineJoin='round';c.stroke();c.strokeStyle='#f0d398';c.lineWidth=1.35;c.setLineDash([3,3.2]);c.lineDashOffset=-this.state.time*5;c.stroke();c.restore();}
     const mark=(x,z,kind,color,size=4)=>{
@@ -63,14 +88,20 @@ export class GameMap {
       else{c.rotate(Math.PI/4);c.fillRect(-size*.65,-size*.65,size*1.3,size*1.3);c.strokeRect(-size*.65,-size*.65,size*1.3,size*1.3);}
       c.restore();
     };
-    for(const o of INTERACTABLES){if(o.type==='chest'&&this.state.save.opened.includes(o.id)||o.type==='memory')continue;mark(o.x,o.z,o.type,o.type==='camp'?'#a5e2d7':o.type==='seal'?'#baa3df':'#d9c293',large?4:3.5);}
+    if(realm){
+      mark(realm.entry.x,realm.entry.z,'camp','#eed7a5',5);
+      realm.nodes.forEach((point,index)=>mark(point.x,point.z,'node',run.marked(index)||run.progress.finished?'#a0beb2':realm.color,4));
+      if(!run.progress.finished)mark(realm.altar.x,realm.altar.z,'guardian','#ffc38c',6);
+    }else for(const o of INTERACTABLES){if(o.type==='chest'&&this.state.save.opened.includes(o.id)||o.type==='memory')continue;mark(o.x,o.z,o.type,o.type==='camp'?'#a5e2d7':o.type==='seal'?'#baa3df':'#d9c293',large?4:3.5);}
     for(const e of this.state.enemies)if(e.hp>0&&Math.hypot(e.x-p.x,e.z-p.z)<26){mark(e.x,e.z,'enemy',e===this.state.lockedTarget?'#ffd38b':e.elite?e.color:'#e58a91',e.type==='boss'?6:e.elite?4.5:3);}
     const o=this.state.objective(),tx=sx(o.x),tz=sy(o.z),dx=tx-w/2,dz=tz-h/2,ratio=Math.min(1,(w/2-15)/Math.max(.01,Math.abs(dx)),(h/2-17)/Math.max(.01,Math.abs(dz))),ox=w/2+dx*ratio,oz=h/2+dz*ratio;
     c.save();c.translate(ox,oz);c.strokeStyle='#f0d29a';c.fillStyle='#153139';c.lineWidth=1.2;c.shadowColor='#ffe4a6';c.shadowBlur=7;c.beginPath();c.arc(0,0,6+Math.sin(this.state.time*2)*.5,0,Math.PI*2);c.fill();c.stroke();c.shadowBlur=0;c.rotate(ratio<1?Math.atan2(dz,dx)+Math.PI/2:0);c.fillStyle='#f7dda8';c.beginPath();c.moveTo(0,-3);c.lineTo(2.6,2.3);c.lineTo(-2.6,2.3);c.fill();c.restore();
     c.save();c.translate(sx(p.x),sy(p.z));c.rotate(-p.yaw);const cone=c.createRadialGradient(0,0,0,0,0,24);cone.addColorStop(0,'#d3f2df26');cone.addColorStop(1,'#d3f2df00');c.fillStyle=cone;c.beginPath();c.moveTo(0,0);c.arc(0,0,24,Math.PI*.32,Math.PI*.68);c.closePath();c.fill();c.shadowColor='#c9fff1';c.shadowBlur=7;c.fillStyle='#dcfff4';c.strokeStyle='#133c3b';c.lineWidth=1.3;c.beginPath();c.moveTo(0,6);c.lineTo(-4,-4);c.lineTo(0,-2);c.lineTo(4,-4);c.closePath();c.fill();c.stroke();c.restore();
     const vignette=c.createRadialGradient(w/2,h/2,Math.min(w,h)*.2,w/2,h/2,Math.max(w,h)*.66);vignette.addColorStop(0,'#06162200');vignette.addColorStop(1,'#06162265');c.fillStyle=vignette;c.fillRect(0,0,w,h);
     c.strokeStyle='#c9c19b35';c.lineWidth=.6;c.strokeRect(5.5,5.5,w-11,h-11);c.fillStyle='#ddcfad';c.font='9px Inter, sans-serif';c.textAlign='center';c.fillText('N',w/2,15);c.beginPath();c.moveTo(w/2,19);c.lineTo(w/2,24);c.stroke();
-    if(large){c.font='15px "Songti SC",serif';for(const z of ZONES){c.fillStyle='#d5ddce';c.shadowColor='#07171f';c.shadowBlur=6;c.fillText(z.name,sx(z.x),sy(z.z-z.radius*.65));}c.shadowBlur=0;}
+    if(large){c.font='15px "Songti SC",serif';c.fillStyle='#e9e4d0';c.shadowColor='#07171f';c.shadowBlur=6;
+      if(realm){for(const point of realm.nodes)c.fillText(point.name,sx(point.x),sy(point.z)-11);c.fillText('返程渡口',sx(realm.entry.x),sy(realm.entry.z)+19);}
+      else for(const z of ZONES)c.fillText(z.name,sx(z.x),sy(z.z-z.radius*.65));c.shadowBlur=0;}
     else{c.strokeStyle='#b4cbb390';c.beginPath();c.moveTo(14,h-17);c.lineTo(14+scale*5,h-17);c.stroke();c.fillStyle='#bbcdbba0';c.font='8px Inter,sans-serif';c.textAlign='left';c.fillText('5 m',14,h-22);}
   }
 }

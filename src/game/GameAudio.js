@@ -32,6 +32,8 @@ export class GameAudio {
     source.connect(filter).connect(envelope).connect(this.combat);source.start(0,Math.random()*.8);source.stop(c.currentTime+duration+.03);source.onended=()=>{source.disconnect();filter.disconnect();envelope.disconnect();};
   }
   play(type) {
+    if(type==='realmMark') {this.tone(660,.36,.09,'sine',1.04);this.tone(990,.62,.055,'triangle',1.01);}
+    if(type==='realmClear')for(const frequency of [392,587,740,988])this.tone(frequency,1.25,.052,'sine',1.005);
     if (type === 'attack') { this.sweep(.22,3400,350,1.8);this.tone(150,.1,.03,'triangle',.4); }
     if (type === 'hit') { this.sweep(.13,2400,700,1.8);this.tone(110, .14, .13, 'triangle', .45); this.tone(1900, .12, .025, 'sine', .75); }
     if(type==='slash'){this.sweep(.9,180,4800,2.5);this.tone(110,.9,.16,'triangle',.45);}
